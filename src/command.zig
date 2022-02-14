@@ -10,33 +10,52 @@ pub const Command = struct {
 };
 
 pub const CapturedFlag = struct {
-  flag: *const Flag,
-  value: FlagValue,
+    flag: *const Flag,
+    value: FlagValue,
 };
 
 pub const Context = struct {
-  flags: []const CapturedFlag,
-  args: []const []const u8,
+    flags: []const CapturedFlag,
+    args: []const []const u8,
 
-  // pub fn string_flag(self: *Context, flag: *const Flag) ?[]const u8 {
-  //   unreachable;
-  // }
+    fn find_flag(self: *const Context, flag: *const Flag) ?*const CapturedFlag {
+        for (self.flags) |_, ix| {
+            const f = self.flags[self.flags.len - 1 - ix];
+            if (f.flag == flag) {
+                return &f;
+            }
+        }
+        return null;
+    }
+
+    pub fn string_flag_value(self: *const Context, comptime flag: *const Flag) ?[]const u8 {
+        if (flag.value_type != .string) @compileError("Flag value type is not string");
+        if (self.find_flag(flag)) |cf| {
+            return cf.value.string;
+        }
+        return null;
+    }
+
+    pub fn is_flag_set(self: *const Context, comptime flag: *const Flag) bool {
+        if (flag.value_type != .bool) @compileError("Flag value type is not bool");
+        return self.find_flag(flag) != null;
+    }
 };
 
 pub const Action = fn (*const Context) anyerror!void;
 
 pub const FlagValueType = enum {
-  bool,
-  string,
-  int,
-  float,
+    bool,
+    string,
+    int,
+    float,
 };
 
 pub const FlagValue = union(FlagValueType) {
-  bool: bool,
-  string: []u8,
-  int: i64,
-  float: f64,
+    bool: bool,
+    string: []u8,
+    int: i64,
+    float: f64,
 };
 
 pub const Flag = struct {
@@ -46,9 +65,4 @@ pub const Flag = struct {
     required: bool = false,
     value_type: FlagValueType,
     // TODO: support value lists
-
-    pub fn get_string(_: *Flag) ?[]const u8 {
-      // TODO
-        return null;
-    }
 };

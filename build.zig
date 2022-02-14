@@ -5,7 +5,7 @@ pub fn build(b: *std.build.Builder) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
 
-    const lib = b.addStaticLibrary("zigcli", "src/main.zig");
+    const lib = b.addStaticLibrary("zig-cli", "src/main.zig");
     lib.setBuildMode(mode);
     lib.install();
 
@@ -17,7 +17,7 @@ pub fn build(b: *std.build.Builder) void {
 
     // const example_step = b.step("examples", "Build examples");
     const example = b.addExecutable("example", "example/simple.zig");
-    example.addPackagePath("cli", "src/main.zig");
+    example.addPackagePath("zig-cli", "src/main.zig");
     example.setBuildMode(mode);
     example.install();
     // example_step.dependOn(&example.step);

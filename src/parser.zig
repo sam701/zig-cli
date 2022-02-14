@@ -3,7 +3,7 @@ const command = @import("command.zig");
 const Allocator = std.mem.Allocator;
 const ArgIterator = std.process.ArgIterator;
 
-const CommandRun = struct {
+const Parser = struct {
     alloc: Allocator,
     arg_iterator: *ArgIterator,
     current_command: *const command.Command,
@@ -19,7 +19,7 @@ const CommandRun = struct {
     };
 
     fn init(cmd: *const command.Command, it: *ArgIterator, alloc: Allocator) !*Self {
-        var s = try alloc.create(CommandRun);
+        var s = try alloc.create(Parser);
         s.alloc = alloc;
         s.arg_iterator = it;
         s.current_command = cmd;
@@ -37,23 +37,17 @@ const CommandRun = struct {
     fn parse(self: *Self) anyerror!ParseResult {
         _ = self.arg_iterator.next(self.alloc);
         while (self.arg_iterator.next(self.alloc)) |arg| {
-            std.log.debug("got param", .{});
             var b = try arg;
-            if(self.parse_arg(b)) |parsed_arg| {
+            if (self.parse_arg(b)) |parsed_arg| {
                 try self.process_arg(parsed_arg);
             }
         }
-        std.log.debug("quit loop", .{});
         var flags = self.captured_flags.toOwnedSlice();
         var args = self.captured_arguments.toOwnedSlice();
-        std.log.debug("command: {s}, flags: {any}", .{self.current_command.name, flags});
-        return ParseResult {
-            .action = self.current_command.action,
-            .ctx = command.Context {
-                .flags = flags,
-                .args = args,
-            }
-        };
+        return ParseResult{ .action = self.current_command.action, .ctx = command.Context{
+            .flags = flags,
+            .args = args,
+        } };
     }
 
     fn process_arg(self: *Self, arg: ArgParseResult) !void {
@@ -66,43 +60,41 @@ const CommandRun = struct {
             },
             .arg => unreachable,
         }
-
     }
 
     fn add_flag(self: *Self, flag: *const command.Flag) !void {
         var val: command.FlagValue = undefined;
-        if(flag.value_type == .bool) {
-            val = command.FlagValue{.bool = true};
-        }else{
+        if (flag.value_type == .bool) {
+            val = command.FlagValue{ .bool = true };
+        } else {
             if (self.arg_iterator.next(self.alloc)) |arg| {
                 var str = try arg;
-                switch(flag.value_type){
+                switch (flag.value_type) {
                     .bool => unreachable,
                     .string => {
-                        val = command.FlagValue {.string = str};
+                        val = command.FlagValue{ .string = str };
                     },
                     .int => {
                         if (std.fmt.parseInt(i64, str, 10)) |iv| {
-                            val = command.FlagValue {.int = iv};
-                        }else |_| {
-                            try std.fmt.format(std.io.getStdErr().writer(), "ERROR: flag({s}): cannot parse int value", .{flag.name});
+                            val = command.FlagValue{ .int = iv };
+                        } else |_| {
+                            try std.fmt.format(std.io.getStdErr().writer(), "ERROR: flag({s}): cannot parse int value\n", .{flag.name});
                             std.os.exit(10);
                             unreachable;
                         }
                     },
                     .float => {
                         if (std.fmt.parseFloat(f64, str)) |fv| {
-                            val = command.FlagValue {.float = fv};
-                        }else |_|{
-                            try std.fmt.format(std.io.getStdErr().writer(), "ERROR: flag({s}): cannot parse flaot value", .{flag.name});
+                            val = command.FlagValue{ .float = fv };
+                        } else |_| {
+                            try std.fmt.format(std.io.getStdErr().writer(), "ERROR: flag({s}): cannot parse flaot value\n", .{flag.name});
                             std.os.exit(10);
                             unreachable;
                         }
-
                     },
                 }
             } else {
-                try std.fmt.format(std.io.getStdErr().writer(), "ERROR: missing argument for {s}", .{flag.name});
+                try std.fmt.format(std.io.getStdErr().writer(), "ERROR: missing argument for {s}\n", .{flag.name});
                 std.os.exit(10);
                 unreachable;
             }
@@ -125,7 +117,7 @@ const CommandRun = struct {
                 } else if (find_flag_by_name(self.current_command, arg[2..])) |flag| {
                     return ArgParseResult{ .flag = flag };
                 } else {
-                    std.fmt.format(std.io.getStdErr().writer(), "ERROR: unknown flag {s}", .{arg}) catch unreachable;
+                    std.fmt.format(std.io.getStdErr().writer(), "ERROR: unknown flag {s}\n", .{arg}) catch unreachable;
                     std.os.exit(10);
                     unreachable;
                 }
@@ -148,7 +140,7 @@ const ParseResult = struct {
 
 pub fn run(cmd: *const command.Command, alloc: Allocator) anyerror!void {
     var it = std.process.args();
-    var cr = try CommandRun.init(cmd, &it, alloc);
+    var cr = try Parser.init(cmd, &it, alloc);
     var result = try cr.parse();
     cr.deinit();
     it.deinit();
