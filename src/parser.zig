@@ -34,7 +34,7 @@ const CommandRun = struct {
         self.alloc.destroy(self);
     }
 
-    fn parse(self: *Self) anyerror!void {
+    fn parse(self: *Self) anyerror!ParseResult {
         _ = self.arg_iterator.next(self.alloc);
         while (self.arg_iterator.next(self.alloc)) |arg| {
             std.log.debug("got param", .{});
@@ -45,7 +45,15 @@ const CommandRun = struct {
         }
         std.log.debug("quit loop", .{});
         var flags = self.captured_flags.toOwnedSlice();
+        var args = self.captured_arguments.toOwnedSlice();
         std.log.debug("command: {s}, flags: {any}", .{self.current_command.name, flags});
+        return ParseResult {
+            .action = self.current_command.action,
+            .ctx = command.Context {
+                .flags = flags,
+                .args = args,
+            }
+        };
     }
 
     fn process_arg(self: *Self, arg: ArgParseResult) !void {
@@ -133,12 +141,19 @@ const CommandRun = struct {
     }
 };
 
+const ParseResult = struct {
+    action: command.Action,
+    ctx: command.Context,
+};
+
 pub fn run(cmd: *const command.Command, alloc: Allocator) anyerror!void {
     var it = std.process.args();
-
     var cr = try CommandRun.init(cmd, &it, alloc);
-    defer cr.deinit();
-    return cr.parse();
+    var result = try cr.parse();
+    cr.deinit();
+    it.deinit();
+
+    return result.action(&result.ctx);
 }
 
 fn find_subcommand(cmd: *const command.Command, subcommand_name: []u8) ?*const command.Command {

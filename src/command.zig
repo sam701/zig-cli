@@ -15,8 +15,8 @@ pub const CapturedFlag = struct {
 };
 
 pub const Context = struct {
-  flags: std.SinglyLinkedList(CapturedFlag),
-  args: []const *const CapturedFlag,
+  flags: []const CapturedFlag,
+  args: []const []const u8,
 
   // pub fn string_flag(self: *Context, flag: *const Flag) ?[]const u8 {
   //   unreachable;
