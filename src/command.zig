@@ -2,8 +2,10 @@ const std = @import("std");
 
 pub const Command = struct {
     name: []const u8,
+    /// Detailed command description
     description: ?[]const u8 = null,
-    usage: []const u8,
+    /// One liner for subcommands
+    help: []const u8,
     flags: ?[]const *const Flag = null,
     subcommands: ?[]const *const Command = null,
     action: Action,
@@ -61,8 +63,9 @@ pub const FlagValue = union(FlagValueType) {
 pub const Flag = struct {
     name: []const u8,
     one_char_alias: ?u8 = null,
-    usage: []const u8,
+    help: []const u8,
     required: bool = false,
+    // TODO: make this optional -> bool
     value_type: FlagValueType,
     // TODO: support value lists
 };

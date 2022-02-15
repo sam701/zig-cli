@@ -6,42 +6,47 @@ const allocator = gpa.allocator();
 
 const ip_flag = &cli.Flag{
     .name = "ip",
-    .usage = "this is the IP address",
+    .help = "this is the IP address",
     .value_type = .string,
 };
 const int_flag = &cli.Flag{
     .name = "int",
-    .usage = "this is an int",
+    .help = "this is an int",
     .value_type = .int,
 };
 const bool_flag = &cli.Flag{
     .name = "bool",
-    .usage = "this is a bool",
+    .help = "this is a bool",
     .value_type = .bool,
 };
 const app = &cli.Command{
     .name = "abc",
-    .usage = "this is a test command",
+    .help = "this is a test command",
     .subcommands = &.{&cli.Command{
         .name = "sub1",
-        .usage = "it's a try",
+        .help = "it's a try",
+        .description = 
+            \\this is my awesome multipline description.
+            \\This is already line 2.
+            \\And this is line 3.
+            ,
         .flags = &.{
             ip_flag,
             int_flag,
             bool_flag,
             &cli.Flag{
                 .name = "float",
-                .usage = "this is a float",
+                .help = "this is a float",
                 .value_type = .float,
             },
         },
         .subcommands = &.{
             &cli.Command{
                 .name = "sub2",
-                .usage = "sub2 usage",
+                .help = "sub2 help",
                 .flags = &.{&cli.Flag{
                     .name = "name",
-                    .usage = "name usage",
+                    .help = "name help",
                     .value_type = .string,
                 }},
                 .action = run_sub2,

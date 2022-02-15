@@ -3,10 +3,18 @@ const command = @import("command.zig");
 const Allocator = std.mem.Allocator;
 const ArgIterator = std.process.ArgIterator;
 
+const help_flag = &command.Flag {
+    .name = "help",
+    .help = "Show this help output.",
+    .one_char_alias = 'h',
+    .value_type = .bool,
+};
+
 const Parser = struct {
     alloc: Allocator,
     arg_iterator: *ArgIterator,
     current_command: *const command.Command,
+    command_path: std.ArrayList(*const command.Command),
     captured_flags: std.ArrayList(command.CapturedFlag),
     captured_arguments: std.ArrayList([]const u8),
 
@@ -23,14 +31,16 @@ const Parser = struct {
         s.alloc = alloc;
         s.arg_iterator = it;
         s.current_command = cmd;
-        s.captured_flags = std.ArrayList(command.CapturedFlag).init(alloc);
-        s.captured_arguments = std.ArrayList([]const u8).init(alloc);
+        s.command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16);
+        s.captured_flags = try std.ArrayList(command.CapturedFlag).initCapacity(alloc, 16);
+        s.captured_arguments = try std.ArrayList([]const u8).initCapacity(alloc, 16);
         return s;
     }
 
     fn deinit(self: *Self) void {
         self.captured_flags.deinit();
         self.captured_arguments.deinit();
+        self.command_path.deinit();
         self.alloc.destroy(self);
     }
 
@@ -53,6 +63,7 @@ const Parser = struct {
     fn process_arg(self: *Self, arg: ArgParseResult) !void {
         switch (arg) {
             .command => |cmd| {
+                try self.command_path.append(self.current_command);
                 self.current_command = cmd;
             },
             .flag => |flag| {
@@ -63,6 +74,12 @@ const Parser = struct {
     }
 
     fn add_flag(self: *Self, flag: *const command.Flag) !void {
+        if (flag == help_flag) {
+            print_command_help(self.current_command, self.command_path.toOwnedSlice());
+            std.os.exit(0);
+            unreachable;
+        }
+
         var val: command.FlagValue = undefined;
         if (flag.value_type == .bool) {
             val = command.FlagValue{ .bool = true };
@@ -131,6 +148,8 @@ const Parser = struct {
             return null;
         }
     }
+
+
 };
 
 const ParseResult = struct {
@@ -159,6 +178,9 @@ fn find_subcommand(cmd: *const command.Command, subcommand_name: []u8) ?*const c
     return null;
 }
 fn find_flag_by_name(cmd: *const command.Command, flag_name: []u8) ?*const command.Flag {
+    if (std.mem.eql(u8, "help", flag_name)) {
+        return help_flag;
+    }
     if (cmd.flags) |flag_list| {
         for (flag_list) |flag| {
             if (std.mem.eql(u8, flag.name, flag_name)) {
@@ -179,4 +201,60 @@ fn find_flag_by_alias(cmd: *const command.Command, flag_alias: u8) ?*const comma
         }
     }
     return null;
+}
+
+fn print_command_help(current_command: *const command.Command, command_path: []const *const command.Command) void {
+    var out = std.io.getStdOut().writer();
+    std.fmt.format(out, "Usage: ", .{}) catch unreachable;
+    for (command_path) |cmd| {
+        std.fmt.format(out, "{s} ", .{cmd.name}) catch unreachable;
+    }
+    std.fmt.format(out, "{s}\n\n{s}\n", .{
+        current_command.name,
+        current_command.help,
+    }) catch unreachable;
+
+    if (current_command.description) |desc| {
+        std.fmt.format(out, "\n{s}\n", .{desc}) catch unreachable;
+    }
+
+    if (current_command.subcommands) |sc_list| {
+        std.fmt.format(out, "\nCommands:\n", .{}) catch unreachable;
+
+        var max_cmd_width:usize = 0;
+        for (sc_list) |sc| {
+            max_cmd_width = std.math.max(max_cmd_width, sc.name.len);
+        }
+        const cmd_column_width = max_cmd_width + 3;
+        for (sc_list) |sc| {
+            std.fmt.format(out, "  {s}", .{sc.name}) catch unreachable;
+            var i: usize = 0;
+            while (i < cmd_column_width - sc.name.len) {
+                std.fmt.format(out, " ", .{}) catch unreachable;
+                i+=1;
+            }
+
+            std.fmt.format(out, "{s}\n", .{sc.help}) catch unreachable;
+        }
+    }
+
+    if(current_command.flags) |flag_list| {
+        std.fmt.format(out, "\nFlags:\n", .{}) catch unreachable;
+
+        var max_flag_width:usize = 0;
+        for (flag_list) |flag| {
+            max_flag_width = std.math.max(max_flag_width, flag.name.len);
+        }
+        const flag_column_width = max_flag_width + 3;
+        for (flag_list) |flag| {
+            std.fmt.format(out, "  --{s}", .{flag.name}) catch unreachable;
+            var i: usize = 0;
+            while (i < flag_column_width - flag.name.len) {
+                std.fmt.format(out, " ", .{}) catch unreachable;
+                i+=1;
+            }
+
+            std.fmt.format(out, "{s}\n", .{flag.help}) catch unreachable;
+        }
+    }
 }
