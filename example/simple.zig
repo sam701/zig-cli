@@ -26,7 +26,7 @@ const app = &cli.Command{
         .name = "sub1",
         .help = "it's a try",
         .description = 
-            \\this is my awesome multipline description.
+            \\this is my awesome multiline description.
             \\This is already line 2.
             \\And this is line 3.
             ,
