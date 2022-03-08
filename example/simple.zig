@@ -9,6 +9,7 @@ var ip_option = cli.Option{
     .help = "this is the IP address",
     .short_alias = 'i',
     .value = cli.OptionValue{ .string = null },
+    .value_name = "IP",
 };
 var int_option = cli.Option{
     .long_name = "int",

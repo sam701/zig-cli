@@ -63,10 +63,8 @@ const Parser = struct {
                 try self.process_option(option);
             },
             .arg => |val| {
-                if (self.current_command.subcommands) |_|{
-                    fail("Commands with subcommands ('{s}') are not allowed to take arguments ('{s}')",
-                        .{ self.current_command.name, val }
-                    );
+                if (self.current_command.subcommands) |_| {
+                    fail("Commands with subcommands ('{s}') are not allowed to take arguments ('{s}')", .{ self.current_command.name, val });
                 }
                 try self.captured_arguments.append(val);
             },
@@ -204,6 +202,9 @@ fn find_option_by_name(cmd: *const command.Command, option_name: []u8) ?*command
     return null;
 }
 fn find_option_by_alias(cmd: *const command.Command, option_alias: u8) ?*command.Option {
+    if (option_alias == 'h') {
+        return &help_option;
+    }
     if (cmd.options) |option_list| {
         for (option_list) |option| {
             if (option.short_alias) |alias| {
@@ -232,7 +233,7 @@ fn print_command_help(current_command: *const command.Command, command_path: []c
     }
 
     if (current_command.subcommands) |sc_list| {
-        std.fmt.format(out, "\nCommands:\n", .{}) catch unreachable;
+        std.fmt.format(out, "\nCOMMANDS:\n", .{}) catch unreachable;
 
         var max_cmd_width: usize = 0;
         for (sc_list) |sc| {
@@ -252,22 +253,40 @@ fn print_command_help(current_command: *const command.Command, command_path: []c
     }
 
     if (current_command.options) |option_list| {
-        std.fmt.format(out, "\nOptions:\n", .{}) catch unreachable;
+        std.fmt.format(out, "\nOPTIONS:\n", .{}) catch unreachable;
 
         var max_option_width: usize = 0;
         for (option_list) |option| {
-            max_option_width = std.math.max(max_option_width, option.long_name.len);
+            var w = option.long_name.len + option.value_name.len + 3;
+            max_option_width = std.math.max(max_option_width, w);
         }
         const option_column_width = max_option_width + 3;
         for (option_list) |option| {
-            std.fmt.format(out, "  --{s}", .{option.long_name}) catch unreachable;
-            var i: usize = 0;
-            while (i < option_column_width - option.long_name.len) {
-                std.fmt.format(out, " ", .{}) catch unreachable;
-                i += 1;
+            if (option.short_alias) |alias| {
+                print_spaces(out, 2);
+                std.fmt.format(out, "-{c}, ", .{alias}) catch unreachable;
+            } else {
+                print_spaces(out, 6);
             }
+            std.fmt.format(out, "--{s}", .{option.long_name}) catch unreachable;
+            var width = option.long_name.len;
+            if (option.value != .bool) {
+                std.fmt.format(out, " <{s}>", .{ option.value_name }) catch unreachable;
+                width += option.value_name.len + 3;
+            }
+            print_spaces(out, option_column_width - width);
 
             std.fmt.format(out, "{s}\n", .{option.help}) catch unreachable;
         }
+        std.fmt.format(out, "  -h, --help", .{}) catch unreachable;
+        print_spaces(out, option_column_width - 4);
+        std.fmt.format(out, "Prints help information\n", .{}) catch unreachable;
+    }
+}
+
+fn print_spaces(out: std.fs.File.Writer, cnt: usize) void {
+    var i: usize = 0;
+    while (i < cnt) : (i += 1) {
+        std.fmt.format(out, " ", .{}) catch unreachable;
     }
 }

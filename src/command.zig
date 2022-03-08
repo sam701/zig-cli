@@ -26,5 +26,6 @@ pub const Option = struct {
     help: []const u8,
     required: bool = false,
     value: OptionValue,
+    value_name: []const u8 = "VALUE",
     // TODO: support value lists
 };
