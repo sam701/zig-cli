@@ -3,11 +3,11 @@ const command = @import("command.zig");
 const Allocator = std.mem.Allocator;
 const ArgIterator = std.process.ArgIterator;
 
-var help_option = command.Option {
-    .name = "help",
+var help_option = command.Option{
+    .long_name = "help",
     .help = "Show this help output.",
-    .one_char_alias = 'h',
-    .value = command.OptionValue { .bool = false },
+    .short_alias = 'h',
+    .value = command.OptionValue{ .bool = false },
 };
 
 const Parser = struct {
@@ -74,7 +74,7 @@ const Parser = struct {
         }
 
         option.value = switch (option.value) {
-            .bool => command.OptionValue { .bool = true },
+            .bool => command.OptionValue{ .bool = true },
             else => self.parse_option_value(option),
         };
     }
@@ -89,8 +89,7 @@ const Parser = struct {
                     if (std.fmt.parseInt(i64, str, 10)) |iv| {
                         return command.OptionValue{ .int = iv };
                     } else |_| {
-                        std.fmt.format(std.io.getStdErr().writer(), "ERROR: option({s}): cannot parse int value\n", .{option.name}) catch unreachable;
-                        std.os.exit(10);
+                        fail("option({s}): cannot parse int value", .{option.long_name});
                         unreachable;
                     }
                 },
@@ -98,15 +97,13 @@ const Parser = struct {
                     if (std.fmt.parseFloat(f64, str)) |fv| {
                         return command.OptionValue{ .float = fv };
                     } else |_| {
-                        std.fmt.format(std.io.getStdErr().writer(), "ERROR: option({s}): cannot parse flaot value\n", .{option.name}) catch unreachable;
-                        std.os.exit(10);
+                        fail("option({s}): cannot parse float value", .{option.long_name});
                         unreachable;
                     }
                 },
             }
         } else {
-            std.fmt.format(std.io.getStdErr().writer(), "ERROR: missing argument for {s}\n", .{option.name}) catch unreachable;
-            std.os.exit(10);
+            fail("missing argument for {s}", .{option.long_name});
             unreachable;
         }
     }
@@ -116,20 +113,10 @@ const Parser = struct {
         if (arg[0] == '-') {
             if (arg.len == 1) return ArgParseResult{ .arg = arg };
             if (arg[1] == '-') {
-                // Long option
-                if (arg.len == 2) {
-                    return ArgParseResult{ .arg = arg };
-                } else if (find_option_by_name(self.current_command, arg[2..])) |option| {
-                    return ArgParseResult{ .option = option };
-                } else {
-                    std.fmt.format(std.io.getStdErr().writer(), "ERROR: unknown option {s}\n", .{arg}) catch unreachable;
-                    std.os.exit(10);
-                    unreachable;
-                }
+                return self.parse_long_name(arg);
             } else {
-                // TODO: Short option
+                return self.parse_short_alias(arg);
             }
-            unreachable;
         } else if (find_subcommand(self.current_command, arg)) |sc| {
             return ArgParseResult{ .command = sc };
         } else {
@@ -137,8 +124,40 @@ const Parser = struct {
         }
     }
 
+    fn parse_long_name(self: *const Self, arg: []u8) ArgParseResult {
+        if (arg.len == 2) {
+            return ArgParseResult{ .arg = arg };
+        } else if (find_option_by_name(self.current_command, arg[2..])) |option| {
+            return ArgParseResult{ .option = option };
+        } else {
+            fail("unknown option {s}", .{arg});
+            unreachable;
+        }
+    }
+
+    fn parse_short_alias(self: *const Self, arg: []u8) ArgParseResult {
+        if (arg.len == 1) {
+            return ArgParseResult{ .arg = arg };
+        } else if (arg.len > 2) {
+            fail("illegal short option {s}", .{arg});
+            unreachable;
+        } else if (find_option_by_alias(self.current_command, arg[1])) |option| {
+            return ArgParseResult{ .option = option };
+        } else {
+            fail("unknown option {s}", .{arg});
+            unreachable;
+        }
+    }
 
 };
+
+fn fail(comptime fmt: []const u8, args: anytype) void {
+    var w = std.io.getStdErr().writer();
+    std.fmt.format(w, "ERROR: ", .{}) catch unreachable;
+    std.fmt.format(w, fmt, args) catch unreachable;
+    std.fmt.format(w, "\n", .{}) catch unreachable;
+    std.os.exit(1);
+}
 
 const ParseResult = struct {
     action: command.Action,
@@ -171,7 +190,7 @@ fn find_option_by_name(cmd: *const command.Command, option_name: []u8) ?*command
     }
     if (cmd.options) |option_list| {
         for (option_list) |option| {
-            if (std.mem.eql(u8, option.name, option_name)) {
+            if (std.mem.eql(u8, option.long_name, option_name)) {
                 return option;
             }
         }
@@ -181,7 +200,7 @@ fn find_option_by_name(cmd: *const command.Command, option_name: []u8) ?*command
 fn find_option_by_alias(cmd: *const command.Command, option_alias: u8) ?*command.Option {
     if (cmd.options) |option_list| {
         for (option_list) |option| {
-            if (option.one_char_alias) |alias| {
+            if (option.short_alias) |alias| {
                 if (alias == option_alias) {
                     return option;
                 }
@@ -209,7 +228,7 @@ fn print_command_help(current_command: *const command.Command, command_path: []c
     if (current_command.subcommands) |sc_list| {
         std.fmt.format(out, "\nCommands:\n", .{}) catch unreachable;
 
-        var max_cmd_width:usize = 0;
+        var max_cmd_width: usize = 0;
         for (sc_list) |sc| {
             max_cmd_width = std.math.max(max_cmd_width, sc.name.len);
         }
@@ -219,27 +238,27 @@ fn print_command_help(current_command: *const command.Command, command_path: []c
             var i: usize = 0;
             while (i < cmd_column_width - sc.name.len) {
                 std.fmt.format(out, " ", .{}) catch unreachable;
-                i+=1;
+                i += 1;
             }
 
             std.fmt.format(out, "{s}\n", .{sc.help}) catch unreachable;
         }
     }
 
-    if(current_command.options) |option_list| {
+    if (current_command.options) |option_list| {
         std.fmt.format(out, "\nOptions:\n", .{}) catch unreachable;
 
-        var max_option_width:usize = 0;
+        var max_option_width: usize = 0;
         for (option_list) |option| {
-            max_option_width = std.math.max(max_option_width, option.name.len);
+            max_option_width = std.math.max(max_option_width, option.long_name.len);
         }
         const option_column_width = max_option_width + 3;
         for (option_list) |option| {
-            std.fmt.format(out, "  --{s}", .{option.name}) catch unreachable;
+            std.fmt.format(out, "  --{s}", .{option.long_name}) catch unreachable;
             var i: usize = 0;
-            while (i < option_column_width - option.name.len) {
+            while (i < option_column_width - option.long_name.len) {
                 std.fmt.format(out, " ", .{}) catch unreachable;
-                i+=1;
+                i += 1;
             }
 
             std.fmt.format(out, "{s}\n", .{option.help}) catch unreachable;

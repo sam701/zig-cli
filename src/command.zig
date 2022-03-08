@@ -21,8 +21,8 @@ pub const OptionValue = union(enum) {
 };
 
 pub const Option = struct {
-    name: []const u8,
-    one_char_alias: ?u8 = null,
+    long_name: []const u8,
+    short_alias: ?u8 = null,
     help: []const u8,
     required: bool = false,
     value: OptionValue,

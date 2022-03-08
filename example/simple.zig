@@ -5,29 +5,30 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 
 var ip_option = cli.Option{
-    .name = "ip",
+    .long_name = "ip",
     .help = "this is the IP address",
+    .short_alias = 'i',
     .value = cli.OptionValue{ .string = null },
 };
 var int_option = cli.Option{
-    .name = "int",
+    .long_name = "int",
     .help = "this is an int",
     .value = cli.OptionValue{ .int = null },
 };
 var bool_option = cli.Option{
-    .name = "bool",
+    .long_name = "bool",
     .help = "this is a bool",
     .value = cli.OptionValue{ .bool = false },
 };
 var float_option = cli.Option{
-                .name = "float",
+                .long_name = "float",
                 .help = "this is a float",
                 .value = cli.OptionValue{ .float = 0.34 },
             };
 
 var name_option = cli.Option{
-                    .name = "name",
-                    .help = "name help",
+                    .long_name = "long_name",
+                    .help = "long_name help",
                     .value = cli.OptionValue{ .string = null },
                 };
 var app = &cli.Command{
