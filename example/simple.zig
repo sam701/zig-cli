@@ -69,11 +69,13 @@ fn run_main(_: ?[]const []const u8) anyerror!void {
     std.log.debug("running main", .{});
 }
 
-fn run_sub1(_: ?[]const []const u8) anyerror!void {
-    std.log.debug("running sub1: ip=", .{});
+fn run_sub1(args: ?[]const []const u8) anyerror!void {
+    std.log.debug("running sub1: ip={s} args={any}", .{ ip_option.value.string.?, args });
 }
 
-fn run_sub2(_: ?[]const []const u8) anyerror!void {
+fn run_sub2(args: ?[]const []const u8) anyerror!void {
     var ip = ip_option.value.string.?;
-    std.log.debug("running sub2: ip={s}, bool={}, float={}", .{ ip, bool_option.value.bool, float_option.value.float });
+    var cnt = if (args) |v| v.len else 0;
+    std.log.debug("running sub2: ip={s}, bool={}, float={} arg_count={}", 
+        .{ ip, bool_option.value.bool, float_option.value.float, cnt });
 }

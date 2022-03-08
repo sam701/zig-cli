@@ -62,7 +62,14 @@ const Parser = struct {
             .option => |option| {
                 try self.process_option(option);
             },
-            .arg => unreachable,
+            .arg => |val| {
+                if (self.current_command.subcommands) |_|{
+                    fail("Commands with subcommands ('{s}') are not allowed to take arguments ('{s}')",
+                        .{ self.current_command.name, val }
+                    );
+                }
+                try self.captured_arguments.append(val);
+            },
         }
     }
 
@@ -120,7 +127,7 @@ const Parser = struct {
         } else if (find_subcommand(self.current_command, arg)) |sc| {
             return ArgParseResult{ .command = sc };
         } else {
-            return null;
+            return ArgParseResult{ .arg = arg };
         }
     }
 
@@ -148,7 +155,6 @@ const Parser = struct {
             unreachable;
         }
     }
-
 };
 
 fn fail(comptime fmt: []const u8, args: anytype) void {
