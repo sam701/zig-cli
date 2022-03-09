@@ -37,7 +37,7 @@ var app = &cli.Command{
     .help = "this is a test command",
     .subcommands = &.{&cli.Command{
         .name = "sub1",
-        .help = "it's a try",
+        .help = "another awesome command",
         .description = 
         \\this is my awesome multiline description.
         \\This is already line 2.
