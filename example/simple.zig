@@ -53,7 +53,6 @@ var app = &cli.Command{
             &cli.Command{
                 .name = "sub2",
                 .help = "sub2 help",
-                .options = &.{&name_option},
                 .action = run_sub2,
             },
         },
