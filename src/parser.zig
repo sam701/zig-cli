@@ -43,6 +43,7 @@ const Parser = struct {
     }
 
     fn parse(self: *Self) anyerror!ParseResult {
+        validate_command(self.current_command);
         _ = self.arg_iterator.next(self.alloc);
         while (self.arg_iterator.next(self.alloc)) |arg| {
             var b = try arg;
@@ -51,12 +52,18 @@ const Parser = struct {
             }
         }
         var args = self.captured_arguments.toOwnedSlice();
-        return ParseResult{ .action = self.current_command.action.?, .args = args };
+        if (self.current_command.action) |action| {
+            return ParseResult{ .action = action, .args = args };
+        } else {
+            fail("command '{s}': no subcommand provided", .{self.current_command.name});
+            unreachable;
+        }
     }
 
     fn process_arg(self: *Self, arg: ArgParseResult) !void {
         switch (arg) {
             .command => |cmd| {
+                validate_command(cmd);
                 try self.command_path.append(self.current_command);
                 self.current_command = cmd;
             },
@@ -64,9 +71,6 @@ const Parser = struct {
                 try self.process_option(option);
             },
             .arg => |val| {
-                if (self.current_command.subcommands) |_| {
-                    fail("Commands with subcommands ('{s}') are not allowed to take arguments ('{s}')", .{ self.current_command.name, val });
-                }
                 try self.captured_arguments.append(val);
             },
         }
@@ -123,8 +127,13 @@ const Parser = struct {
             } else {
                 return self.parse_short_alias(arg);
             }
-        } else if (find_subcommand(self.current_command, arg)) |sc| {
-            return ArgParseResult{ .command = sc };
+        } else if (self.current_command.subcommands) |_| {
+            if (find_subcommand(self.current_command, arg)) |sc| {
+                return ArgParseResult{ .command = sc };
+            } else {
+                fail("no such subcommand '{s}'", .{arg});
+                unreachable;
+            }
         } else {
             return ArgParseResult{ .arg = arg };
         }
@@ -216,4 +225,16 @@ fn find_option_by_alias(cmd: *const command.Command, option_alias: u8) ?*command
         }
     }
     return null;
+}
+
+fn validate_command(cmd: *const command.Command) void {
+    if (cmd.subcommands == null) {
+        if (cmd.action == null) {
+            fail("command '{s}' has neither subcommands no an aciton assigned", .{cmd.name});
+        }
+    } else {
+        if (cmd.action != null) {
+            fail("command '{s}' has subcommands and an action assigned. Commands with subcommands are not allowed to have action.", .{cmd.name});
+        }
+    }
 }

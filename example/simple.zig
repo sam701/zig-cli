@@ -56,9 +56,7 @@ var app = &cli.Command{
                 .action = run_sub2,
             },
         },
-        .action = run_sub1,
     }},
-    .action = run_main,
 };
 
 pub fn main() anyerror!void {
