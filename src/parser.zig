@@ -145,7 +145,7 @@ const Parser = struct {
         } else if (find_option_by_name(self.current_command, arg[2..])) |option| {
             return ArgParseResult{ .option = option };
         } else {
-            fail("unknown option {s}", .{arg});
+            fail("command '{s}' does not have option '{s}'", .{self.current_command.name, arg});
             unreachable;
         }
     }
@@ -159,7 +159,7 @@ const Parser = struct {
         } else if (find_option_by_alias(self.current_command, arg[1])) |option| {
             return ArgParseResult{ .option = option };
         } else {
-            fail("unknown option {s}", .{arg});
+            fail("command '{s}' does not have option '{s}'", .{self.current_command.name, arg});
             unreachable;
         }
     }
