@@ -8,10 +8,10 @@ pub const Command = struct {
     help: []const u8,
     options: ?[]const *Option = null,
     subcommands: ?[]const *const Command = null,
-    action: Action,
+    action: ?Action = null,
 };
 
-pub const Action = fn (args: ?[]const []const u8) anyerror!void;
+pub const Action = fn (args: []const []const u8) anyerror!void;
 
 pub const OptionValue = union(enum) {
     bool: bool,

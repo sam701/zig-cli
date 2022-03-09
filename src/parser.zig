@@ -50,7 +50,7 @@ const Parser = struct {
             }
         }
         var args = self.captured_arguments.toOwnedSlice();
-        return ParseResult{ .action = self.current_command.action, .args = args };
+        return ParseResult{ .action = self.current_command.action.?, .args = args };
     }
 
     fn process_arg(self: *Self, arg: ArgParseResult) !void {
@@ -165,7 +165,7 @@ fn fail(comptime fmt: []const u8, args: anytype) void {
 
 const ParseResult = struct {
     action: command.Action,
-    args: ?[]const []const u8,
+    args: []const []const u8,
 };
 
 pub fn run(cmd: *const command.Command, alloc: Allocator) anyerror!void {
