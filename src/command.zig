@@ -15,7 +15,7 @@ pub const Action = fn (args: []const []const u8) anyerror!void;
 
 pub const OptionValue = union(enum) {
     bool: bool,
-    string: ?[]u8,
+    string: ?[]const u8,
     int: ?i64,
     float: ?f64,
 };

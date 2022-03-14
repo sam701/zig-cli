@@ -29,5 +29,12 @@ OPTIONS:
   -h, --help            Prints help information
 ```
 
+## Features
+* long and short options: `--option1`, `-o`
+* optional `=` sign: `--address=127.0.0.1` equals `--address 127.0.0.1`
+* concatenated short options: `-a -b -c` equals `-abc`
+* subcommands: `command1 -option1 subcommand2 -option2`
+* stop optoin parsing after `--`: `command -- --abc` will consider `--abc` as an argument to `command`.
+
 ## License
 MIT

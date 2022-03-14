@@ -18,6 +18,7 @@ var int_option = cli.Option{
 };
 var bool_option = cli.Option{
     .long_name = "bool",
+    .short_alias = 'b',
     .help = "this is a bool",
     .value = cli.OptionValue{ .bool = false },
 };
