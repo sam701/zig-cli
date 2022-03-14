@@ -71,6 +71,7 @@ const Parser = struct {
     }
 
     fn finalize(self: *Self) ParseResult {
+        ensure_all_required_set(self.current_command);
         var args = self.captured_arguments.toOwnedSlice();
         if (self.current_command.action) |action| {
             return ParseResult{ .action = action, .args = args };
@@ -89,6 +90,7 @@ const Parser = struct {
             },
             .other => |some_name| {
                 if (find_subcommand(self.current_command, some_name)) |cmd| {
+                    ensure_all_required_set(self.current_command);
                     validate_command(cmd);
                     try self.command_path.append(self.current_command);
                     self.current_command = cmd;
@@ -227,6 +229,24 @@ fn set_boolean_options(cmd: *const command.Command, options: []const u8) void {
             opt.value.bool = true;
         } else {
             fail("'-{c}' is not a boolean option", .{alias});
+        }
+    }
+}
+
+fn ensure_all_required_set(cmd: *const command.Command) void {
+    if (cmd.options) |list| {
+        for (list) |option| {
+            if (option.required) {
+                var not_set = switch (option.value) {
+                    .bool => false,
+                    .string => |x| x == null,
+                    .int => |x| x == null,
+                    .float => |x| x == null,
+                };
+                if (not_set) {
+                    fail("option '{s}' is required", .{option.long_name});
+                }
+            }
         }
     }
 }
