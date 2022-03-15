@@ -1,21 +1,27 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+
 const command = @import("command.zig");
 const help = @import("./help.zig");
-const Allocator = std.mem.Allocator;
-const ArgIterator = std.process.ArgIterator;
 const argp = @import("./arg.zig");
+const iterators = @import("./iterators.zig");
 
-const ParseResult = struct {
+pub const ParseResult = struct {
     action: command.Action,
     args: []const []const u8,
 };
 
 pub fn run(cmd: *const command.Command, alloc: Allocator) anyerror!void {
-    var it = std.process.args();
-    var cr = try Parser.init(cmd, &it, alloc);
+    var iter = std.process.args();
+    var it = iterators.SystemArgIterator{
+        .iter = &iter,
+        .alloc = alloc,
+    };
+
+    var cr = try Parser(iterators.SystemArgIterator).init(cmd, it, alloc);
     var result = try cr.parse();
     cr.deinit();
-    it.deinit();
+    iter.deinit();
 
     return result.action(result.args);
 }
@@ -27,116 +33,114 @@ var help_option = command.Option{
     .value = command.OptionValue{ .bool = false },
 };
 
-const Parser = struct {
-    alloc: Allocator,
-    arg_iterator: *ArgIterator,
-    current_command: *const command.Command,
-    command_path: std.ArrayList(*const command.Command),
-    captured_arguments: std.ArrayList([]const u8),
+pub fn Parser(comptime Iterator: type) type {
+    return struct {
+        const Self = @This();
 
-    const Self = @This();
+        alloc: Allocator,
+        arg_iterator: Iterator,
+        current_command: *const command.Command,
+        command_path: std.ArrayList(*const command.Command),
+        captured_arguments: std.ArrayList([]const u8),
 
-    fn init(cmd: *const command.Command, it: *ArgIterator, alloc: Allocator) !*Self {
-        var s = try alloc.create(Parser);
-        s.alloc = alloc;
-        s.arg_iterator = it;
-        s.current_command = cmd;
-        s.command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16);
-        s.captured_arguments = try std.ArrayList([]const u8).initCapacity(alloc, 16);
-        return s;
-    }
+        pub fn init(cmd: *const command.Command, it: Iterator, alloc: Allocator) !*Self {
+            var s = try alloc.create(Parser(Iterator));
+            s.alloc = alloc;
+            s.arg_iterator = it;
+            s.current_command = cmd;
+            s.command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16);
+            s.captured_arguments = try std.ArrayList([]const u8).initCapacity(alloc, 16);
+            return s;
+        }
 
-    fn deinit(self: *Self) void {
-        self.captured_arguments.deinit();
-        self.command_path.deinit();
-        self.alloc.destroy(self);
-    }
+        pub fn deinit(self: *Self) void {
+            self.captured_arguments.deinit();
+            self.command_path.deinit();
+            self.alloc.destroy(self);
+        }
 
-    fn parse(self: *Self) anyerror!ParseResult {
-        validate_command(self.current_command);
-        _ = self.arg_iterator.next(self.alloc);
-        var args_only = false;
-        while (self.next_arg()) |arg| {
-            if (args_only) {
-                try self.captured_arguments.append(arg);
-            } else if (argp.interpret(arg)) |int| {
-                args_only = try self.process_interpretation(&int);
-            } else |err| {
-                switch (err) {
-                    error.MissingOptionArgument => fail("missing argument: '{s}'", .{arg}),
+        pub fn parse(self: *Self) anyerror!ParseResult {
+            validate_command(self.current_command);
+            _ = self.next_arg();
+            var args_only = false;
+            while (self.next_arg()) |arg| {
+                if (args_only) {
+                    try self.captured_arguments.append(arg);
+                } else if (argp.interpret(arg)) |int| {
+                    args_only = try self.process_interpretation(&int);
+                } else |err| {
+                    switch (err) {
+                        error.MissingOptionArgument => fail("missing argument: '{s}'", .{arg}),
+                    }
                 }
             }
+            return self.finalize();
         }
-        return self.finalize();
-    }
 
-    fn finalize(self: *Self) ParseResult {
-        ensure_all_required_set(self.current_command);
-        var args = self.captured_arguments.toOwnedSlice();
-        if (self.current_command.action) |action| {
-            return ParseResult{ .action = action, .args = args };
-        } else {
-            fail("command '{s}': no subcommand provided", .{self.current_command.name});
-            unreachable;
+        fn finalize(self: *Self) ParseResult {
+            ensure_all_required_set(self.current_command);
+            var args = self.captured_arguments.toOwnedSlice();
+            if (self.current_command.action) |action| {
+                return ParseResult{ .action = action, .args = args };
+            } else {
+                fail("command '{s}': no subcommand provided", .{self.current_command.name});
+                unreachable;
+            }
         }
-    }
 
-    fn process_interpretation(self: *Self, int: *const argp.ArgumentInterpretation) !bool {
-        var args_only = false;
-        try switch (int.*) {
-            .option => |opt| self.process_option(&opt),
-            .double_dash => {
-                args_only = true;
-            },
-            .other => |some_name| {
-                if (find_subcommand(self.current_command, some_name)) |cmd| {
-                    ensure_all_required_set(self.current_command);
-                    validate_command(cmd);
-                    try self.command_path.append(self.current_command);
-                    self.current_command = cmd;
-                } else {
-                    try self.captured_arguments.append(some_name);
+        fn process_interpretation(self: *Self, int: *const argp.ArgumentInterpretation) !bool {
+            var args_only = false;
+            try switch (int.*) {
+                .option => |opt| self.process_option(&opt),
+                .double_dash => {
                     args_only = true;
-                }
-            },
-        };
-        return args_only;
-    }
-
-    fn next_arg(self: *Self) ?[]const u8 {
-        if (self.arg_iterator.next(self.alloc)) |arg| {
-            return arg catch unreachable;
-        } else {
-            return null;
-        }
-    }
-
-    fn process_option(self: *Self, option: *const argp.OptionInterpretation) !void {
-        var opt = switch (option.option_type) {
-            .long => find_option_by_name(self.current_command, option.name),
-            .short => a: {
-                set_boolean_options(self.current_command, option.name[0 .. option.name.len - 1]);
-                break :a find_option_by_alias(self.current_command, option.name[option.name.len - 1]);
-            },
-        };
-
-        if (opt == &help_option) {
-            try help.print_command_help(self.current_command, self.command_path.toOwnedSlice());
-            std.os.exit(0);
+                },
+                .other => |some_name| {
+                    if (find_subcommand(self.current_command, some_name)) |cmd| {
+                        ensure_all_required_set(self.current_command);
+                        validate_command(cmd);
+                        try self.command_path.append(self.current_command);
+                        self.current_command = cmd;
+                    } else {
+                        try self.captured_arguments.append(some_name);
+                        args_only = true;
+                    }
+                },
+            };
+            return args_only;
         }
 
-        opt.value = switch (opt.value) {
-            .bool => command.OptionValue{ .bool = true },
-            else => a: {
-                const arg = option.value orelse self.next_arg() orelse {
-                    fail("missing argument for {s}", .{opt.long_name});
-                    unreachable;
-                };
-                break :a parse_option_value(arg, opt);
-            },
-        };
-    }
-};
+        fn next_arg(self: *Self) ?[]const u8 {
+            return self.arg_iterator.next();
+        }
+
+        fn process_option(self: *Self, option: *const argp.OptionInterpretation) !void {
+            var opt = switch (option.option_type) {
+                .long => find_option_by_name(self.current_command, option.name),
+                .short => a: {
+                    set_boolean_options(self.current_command, option.name[0 .. option.name.len - 1]);
+                    break :a find_option_by_alias(self.current_command, option.name[option.name.len - 1]);
+                },
+            };
+
+            if (opt == &help_option) {
+                try help.print_command_help(self.current_command, self.command_path.toOwnedSlice());
+                std.os.exit(0);
+            }
+
+            opt.value = switch (opt.value) {
+                .bool => command.OptionValue{ .bool = true },
+                else => a: {
+                    const arg = option.value orelse self.next_arg() orelse {
+                        fail("missing argument for {s}", .{opt.long_name});
+                        unreachable;
+                    };
+                    break :a parse_option_value(arg, opt);
+                },
+            };
+        }
+    };
+}
 
 fn parse_option_value(text: []const u8, option: *command.Option) command.OptionValue {
     switch (option.value) {
