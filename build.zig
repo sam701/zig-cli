@@ -16,11 +16,15 @@ pub fn build(b: *std.build.Builder) void {
     test_step.dependOn(&main_tests.step);
 
     // const example_step = b.step("examples", "Build examples");
-    const example = b.addExecutable("example", "example/simple.zig");
-    example.addPackagePath("zig-cli", "src/main.zig");
-    example.setBuildMode(mode);
-    example.install();
-    // example_step.dependOn(&example.step);
+    const simple = b.addExecutable("simple", "example/simple.zig");
+    simple.addPackagePath("zig-cli", "src/main.zig");
+    simple.setBuildMode(mode);
+    simple.install();
 
-    b.default_step.dependOn(&example.step);
+    const short = b.addExecutable("short", "example/short.zig");
+    short.addPackagePath("zig-cli", "src/main.zig");
+    short.setBuildMode(mode);
+    short.install();
+
+    b.default_step.dependOn(&simple.step);
 }
