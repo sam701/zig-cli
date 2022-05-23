@@ -9,7 +9,8 @@ Inspired by [urfave/cli](https://github.com/urfave/cli) Go package.
 * optional `=` sign: `--address=127.0.0.1` equals `--address 127.0.0.1`
 * concatenated short options: `-a -b -c` equals `-abc`
 * subcommands: `command1 -option1 subcommand2 -option2`
-* stop optoin parsing after `--`: `command -- --abc` will consider `--abc` as an argument to `command`.
+* multiple option values: `--opt val1 --opt val2 --opt val3`
+* stops option parsing after `--`: `command -- --abc` will consider `--abc` as an argument to `command`.
 * errors on missing required options: `ERROR: option 'ip' is required`
 * prints help with `--help`
 

@@ -18,6 +18,7 @@ pub const OptionValue = union(enum) {
     string: ?[]const u8,
     int: ?i64,
     float: ?f64,
+    string_list: ?[]const []const u8,
 };
 
 pub const Option = struct {
@@ -27,5 +28,4 @@ pub const Option = struct {
     required: bool = false,
     value: OptionValue,
     value_name: []const u8 = "VALUE",
-    // TODO: support value lists
 };

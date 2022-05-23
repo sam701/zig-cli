@@ -33,6 +33,9 @@ var help_option = command.Option{
     .value = command.OptionValue{ .bool = false },
 };
 
+const ValueList = std.ArrayList([]const u8);
+const ValueListMap = std.AutoHashMap(*command.Option, ValueList);
+
 pub fn Parser(comptime Iterator: type) type {
     return struct {
         const Self = @This();
@@ -42,6 +45,7 @@ pub fn Parser(comptime Iterator: type) type {
         current_command: *const command.Command,
         command_path: std.ArrayList(*const command.Command),
         captured_arguments: std.ArrayList([]const u8),
+        value_lists: ?ValueListMap,
 
         pub fn init(cmd: *const command.Command, it: Iterator, alloc: Allocator) !*Self {
             var s = try alloc.create(Parser(Iterator));
@@ -50,6 +54,7 @@ pub fn Parser(comptime Iterator: type) type {
             s.current_command = cmd;
             s.command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16);
             s.captured_arguments = try std.ArrayList([]const u8).initCapacity(alloc, 16);
+            s.value_lists = null;
             return s;
         }
 
@@ -80,6 +85,16 @@ pub fn Parser(comptime Iterator: type) type {
         fn finalize(self: *Self) ParseResult {
             ensure_all_required_set(self.current_command);
             var args = self.captured_arguments.toOwnedSlice();
+
+            if (self.value_lists) |vl| {
+                var it = vl.iterator();
+                while (it.next()) |entry| {
+                    var option: *command.Option = entry.key_ptr.*;
+                    option.value.string_list = entry.value_ptr.toOwnedSlice();
+                }
+                self.value_lists.?.deinit();
+            }
+
             if (self.current_command.action) |action| {
                 return ParseResult{ .action = action, .args = args };
             } else {
@@ -115,7 +130,7 @@ pub fn Parser(comptime Iterator: type) type {
         }
 
         fn process_option(self: *Self, option: *const argp.OptionInterpretation) !void {
-            var opt = switch (option.option_type) {
+            var opt: *command.Option = switch (option.option_type) {
                 .long => find_option_by_name(self.current_command, option.name),
                 .short => a: {
                     set_boolean_options(self.current_command, option.name[0 .. option.name.len - 1]);
@@ -128,41 +143,52 @@ pub fn Parser(comptime Iterator: type) type {
                 std.os.exit(0);
             }
 
-            opt.value = switch (opt.value) {
-                .bool => command.OptionValue{ .bool = true },
-                else => a: {
+            switch (opt.value) {
+                .bool => opt.value = command.OptionValue{ .bool = true },
+                else => {
                     const arg = option.value orelse self.next_arg() orelse {
                         fail("missing argument for {s}", .{opt.long_name});
                         unreachable;
                     };
-                    break :a parse_option_value(arg, opt);
+                    try self.parse_and_set_option_value(arg, opt);
                 },
-            };
+            }
+        }
+
+        fn parse_and_set_option_value(self: *Self, text: []const u8, option: *command.Option) !void {
+            switch (option.value) {
+                .bool => unreachable,
+                .string => option.value = command.OptionValue{ .string = text },
+                .int => {
+                    if (std.fmt.parseInt(i64, text, 10)) |iv| {
+                        option.value = command.OptionValue{ .int = iv };
+                    } else |_| {
+                        fail("option({s}): cannot parse int value", .{option.long_name});
+                        unreachable;
+                    }
+                },
+                .float => {
+                    if (std.fmt.parseFloat(f64, text)) |fv| {
+                        option.value = command.OptionValue{ .float = fv };
+                    } else |_| {
+                        fail("option({s}): cannot parse float value", .{option.long_name});
+                        unreachable;
+                    }
+                },
+                .string_list => {
+                    if (self.value_lists == null) {
+                        self.value_lists = ValueListMap.init(self.alloc);
+                    }
+
+                    var res = try self.value_lists.?.getOrPut(option);
+                    if (!res.found_existing) {
+                        res.value_ptr.* = try ValueList.initCapacity(self.alloc, 16);
+                    }
+                    try res.value_ptr.append(text);
+                },
+            }
         }
     };
-}
-
-fn parse_option_value(text: []const u8, option: *command.Option) command.OptionValue {
-    switch (option.value) {
-        .bool => unreachable,
-        .string => return command.OptionValue{ .string = text },
-        .int => {
-            if (std.fmt.parseInt(i64, text, 10)) |iv| {
-                return command.OptionValue{ .int = iv };
-            } else |_| {
-                fail("option({s}): cannot parse int value", .{option.long_name});
-                unreachable;
-            }
-        },
-        .float => {
-            if (std.fmt.parseFloat(f64, text)) |fv| {
-                return command.OptionValue{ .float = fv };
-            } else |_| {
-                fail("option({s}): cannot parse float value", .{option.long_name});
-                unreachable;
-            }
-        },
-    }
 }
 
 fn fail(comptime fmt: []const u8, args: anytype) void {
@@ -246,6 +272,7 @@ fn ensure_all_required_set(cmd: *const command.Command) void {
                     .string => |x| x == null,
                     .int => |x| x == null,
                     .float => |x| x == null,
+                    .string_list => |x| x == null,
                 };
                 if (not_set) {
                     fail("option '{s}' is required", .{option.long_name});
