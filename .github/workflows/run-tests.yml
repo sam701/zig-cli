@@ -1,0 +1,16 @@
+name: run-tests
+on:
+  push:
+    branches:
+      - '**'
+  pull_request: {}
+jobs:
+  validate_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: goto-bus-stop/setup-zig@v1
+        with:
+          version: 0.9.1
+      - run: zig fmt --check *.zig src/*.zig
+      - run: zig build test
