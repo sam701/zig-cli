@@ -27,4 +27,5 @@ pub fn build(b: *std.build.Builder) void {
     short.install();
 
     b.default_step.dependOn(&simple.step);
+    b.default_step.dependOn(&short.step);
 }

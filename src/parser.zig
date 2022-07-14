@@ -47,21 +47,20 @@ pub fn Parser(comptime Iterator: type) type {
         captured_arguments: std.ArrayList([]const u8),
         value_lists: ?ValueListMap,
 
-        pub fn init(cmd: *const command.Command, it: Iterator, alloc: Allocator) !*Self {
-            var s = try alloc.create(Parser(Iterator));
-            s.alloc = alloc;
-            s.arg_iterator = it;
-            s.current_command = cmd;
-            s.command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16);
-            s.captured_arguments = try std.ArrayList([]const u8).initCapacity(alloc, 16);
-            s.value_lists = null;
-            return s;
+        pub fn init(cmd: *const command.Command, it: Iterator, alloc: Allocator) !Self {
+            return Self{
+                .alloc = alloc,
+                .arg_iterator = it,
+                .current_command = cmd,
+                .command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16),
+                .captured_arguments = try std.ArrayList([]const u8).initCapacity(alloc, 16),
+                .value_lists = null,
+            };
         }
 
         pub fn deinit(self: *Self) void {
             self.captured_arguments.deinit();
             self.command_path.deinit();
-            self.alloc.destroy(self);
         }
 
         pub fn parse(self: *Self) anyerror!ParseResult {
