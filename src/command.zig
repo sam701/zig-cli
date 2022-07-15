@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub const Command = struct {
     name: []const u8,
-    /// Detailed command description
+    /// Detailed multiline command description
     description: ?[]const u8 = null,
     /// One liner for subcommands
     help: []const u8,
