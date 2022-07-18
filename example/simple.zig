@@ -35,7 +35,7 @@ var name_option = cli.Option{
     .value = cli.OptionValue{ .string = null },
 };
 var app = &cli.Command{
-    .name = "abc",
+    .name = "simple",
     .help = "this is a test command",
     .description = "This is multiline command\ndescription.",
     .subcommands = &.{&cli.Command{

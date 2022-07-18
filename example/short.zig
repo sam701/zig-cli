@@ -16,7 +16,7 @@ var port = cli.Option{
     .value = cli.OptionValue{ .int = null },
 };
 var app = &cli.Command{
-    .name = "run",
+    .name = "short",
     .help = "run the server",
     .options = &.{ &host, &port },
     .action = run_server,
