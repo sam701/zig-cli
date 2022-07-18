@@ -6,11 +6,17 @@ on:
   pull_request: {}
 jobs:
   validate_and_test:
+    strategy:
+      matrix:
+        zig_version:
+          - 0.9.1
+          - master
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: goto-bus-stop/setup-zig@v1
         with:
-          version: 0.9.1
+          version: ${{ matrix.zig_version }}
       - run: zig fmt --check *.zig src/*.zig
       - run: zig build test
+      - run: zig build && ./zig-out/bin/simple sub1 -h

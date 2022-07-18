@@ -12,17 +12,23 @@ pub const ParseResult = struct {
 };
 
 pub fn run(cmd: *const command.Command, alloc: Allocator) anyerror!void {
+    const iterator_uses_allocator = @typeInfo(@TypeOf(std.process.ArgIterator.next)).Fn.args.len > 1;
     var iter = std.process.args();
-    var it = iterators.SystemArgIterator{
-        .iter = &iter,
-        .alloc = alloc,
-    };
+    var cr = parser: {
+        if (iterator_uses_allocator) {
+            var it = iterators.SystemArgIterator{
+                .iter = &iter,
+                .alloc = alloc,
+            };
 
-    var cr = try Parser(iterators.SystemArgIterator).init(cmd, it, alloc);
+            break :parser try Parser(iterators.SystemArgIterator).init(cmd, it, alloc);
+        } else {
+            break :parser try Parser(@TypeOf(iter)).init(cmd, iter, alloc);
+        }
+    };
     var result = try cr.parse();
     cr.deinit();
     iter.deinit();
-
     return result.action(result.args);
 }
 
