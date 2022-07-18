@@ -13,6 +13,7 @@ Inspired by [urfave/cli](https://github.com/urfave/cli) Go package.
 * stops option parsing after `--`: `command -- --abc` will consider `--abc` as an argument to `command`.
 * errors on missing required options: `ERROR: option 'ip' is required`
 * prints help with `--help`
+* colored help messages when TTY is attached
 
 ## Usage
 ```zig
