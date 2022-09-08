@@ -5,6 +5,7 @@ const command = @import("command.zig");
 const help = @import("./help.zig");
 const argp = @import("./arg.zig");
 const iterators = @import("./iterators.zig");
+const Printer = @import("./Printer.zig");
 
 pub const ParseResult = struct {
     action: command.Action,
@@ -191,10 +192,13 @@ pub fn Parser(comptime Iterator: type) type {
 }
 
 fn fail(comptime fmt: []const u8, args: anytype) void {
-    var w = std.io.getStdErr().writer();
-    std.fmt.format(w, "ERROR: ", .{}) catch unreachable;
-    std.fmt.format(w, fmt, args) catch unreachable;
-    std.fmt.format(w, "\n", .{}) catch unreachable;
+    var p = Printer.init(std.io.getStdErr());
+
+    const color_error = "31;1";
+    p.printInColor(color_error, "ERROR");
+    p.format(": ", .{});
+    p.format(fmt, args);
+    p.write(&.{'\n'});
     std.os.exit(1);
 }
 
@@ -274,7 +278,7 @@ fn ensure_all_required_set(cmd: *const command.Command) void {
                     .string_list => |x| x == null,
                 };
                 if (not_set) {
-                    fail("option '{s}' is required", .{option.long_name});
+                    fail("missing required option '{s}'", .{option.long_name});
                 }
             }
         }
