@@ -11,7 +11,7 @@ pub const Command = struct {
     action: ?Action = null,
 };
 
-pub const Action = fn (args: []const []const u8) anyerror!void;
+pub const Action = *const fn (args: []const []const u8) anyerror!void;
 
 pub const OptionValue = union(enum) {
     bool: bool,
