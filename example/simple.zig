@@ -68,5 +68,5 @@ pub fn main() anyerror!void {
 
 fn run_sub2(args: []const []const u8) anyerror!void {
     var ip = ip_option.value.string.?;
-    std.log.debug("running sub2: ip={s}, bool={}, float={} arg_count={}", .{ ip, bool_option.value.bool, float_option.value.float, args.len });
+    std.log.debug("running sub2: ip={s}, bool={any}, float={any} arg_count={any}", .{ ip, bool_option.value.bool, float_option.value.float, args.len });
 }
