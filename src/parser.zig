@@ -13,17 +13,13 @@ pub const ParseResult = struct {
 };
 
 pub fn run(cmd: *const command.Command, alloc: Allocator) anyerror!void {
-    var iter = std.process.args();
-    var it = iterators.SystemArgIterator{
-        .iter = &iter,
-        .alloc = alloc,
-    };
+    var iter = try std.process.argsWithAllocator(alloc);
+    defer iter.deinit();
 
-    var cr = try Parser(iterators.SystemArgIterator).init(cmd, it, alloc);
+    var cr = try Parser(std.process.ArgIterator).init(cmd, iter, alloc);
+    defer cr.deinit();
+
     var result = try cr.parse();
-    cr.deinit();
-    iter.deinit();
-
     return result.action(result.args);
 }
 
