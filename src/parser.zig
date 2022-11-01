@@ -4,7 +4,6 @@ const Allocator = std.mem.Allocator;
 const command = @import("command.zig");
 const help = @import("./help.zig");
 const argp = @import("./arg.zig");
-const iterators = @import("./iterators.zig");
 const Printer = @import("./Printer.zig");
 
 pub const ParseResult = struct {

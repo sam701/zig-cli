@@ -5,17 +5,31 @@ const command = @import("./command.zig");
 const ppack = @import("./parser.zig");
 const Parser = ppack.Parser;
 const ParseResult = ppack.ParseResult;
-const iterators = @import("./iterators.zig");
 
 const expect = std.testing.expect;
 const alloc = std.testing.allocator;
 
+const StringSliceIterator = struct {
+    items: []const []const u8,
+    index: usize = 0,
+
+    pub fn next(self: *StringSliceIterator) ?[]const u8 {
+        defer self.index += 1;
+
+        if (self.index < self.items.len) {
+            return self.items[self.index];
+        } else {
+            return null;
+        }
+    }
+};
+
 fn run(cmd: *command.Command, items: []const []const u8) !ParseResult {
-    var it = iterators.StringSliceIterator{
+    var it = StringSliceIterator{
         .items = items,
     };
 
-    var parser = try Parser(iterators.StringSliceIterator).init(cmd, it, alloc);
+    var parser = try Parser(StringSliceIterator).init(cmd, it, alloc);
     var result = try parser.parse();
     parser.deinit();
     return result;
