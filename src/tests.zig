@@ -169,11 +169,13 @@ test "mix positional arguments and options" {
         .action = dummy_action,
     };
 
-    var result = try run(&cmd, &.{ "cmd", "--bb", "tt", "arg1", "-a", "val", "arg2" });
+    var result = try run(&cmd, &.{ "cmd", "--bb", "tt", "arg1", "-a", "val", "arg2", "--", "--arg3", "-arg4" });
     defer std.testing.allocator.free(result.args);
     try expect(std.mem.eql(u8, aa.value.string.?, "val"));
     try expect(std.mem.eql(u8, bb.value.string.?, "tt"));
-    try expect(result.args.len == 2);
+    try expect(result.args.len == 4);
     try expect(std.mem.eql(u8, result.args[0], "arg1"));
     try expect(std.mem.eql(u8, result.args[1], "arg2"));
+    try expect(std.mem.eql(u8, result.args[2], "--arg3"));
+    try expect(std.mem.eql(u8, result.args[3], "-arg4"));
 }
