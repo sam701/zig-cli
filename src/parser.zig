@@ -113,7 +113,6 @@ pub fn Parser(comptime Iterator: type) type {
                         self.current_command = cmd;
                     } else {
                         try self.captured_arguments.append(some_name);
-                        args_only = true;
                     }
                 },
             };

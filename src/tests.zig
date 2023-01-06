@@ -149,3 +149,31 @@ test "string list" {
 
     alloc.free(aa.value.string_list.?);
 }
+
+test "mix positional arguments and options" {
+    var aa = command.Option{
+        .long_name = "aa",
+        .short_alias = 'a',
+        .help = "option aa",
+        .value = command.OptionValue{ .string = null },
+    };
+    var bb = command.Option{
+        .long_name = "bb",
+        .help = "option bb",
+        .value = command.OptionValue{ .string = null },
+    };
+    var cmd = command.Command{
+        .name = "abc",
+        .options = &.{ &aa, &bb },
+        .help = "help",
+        .action = dummy_action,
+    };
+
+    var result = try run(&cmd, &.{ "cmd", "--bb", "tt", "arg1", "-a", "val", "arg2" });
+    defer std.testing.allocator.free(result.args);
+    try expect(std.mem.eql(u8, aa.value.string.?, "val"));
+    try expect(std.mem.eql(u8, bb.value.string.?, "tt"));
+    try expect(result.args.len == 2);
+    try expect(std.mem.eql(u8, result.args[0], "arg1"));
+    try expect(std.mem.eql(u8, result.args[1], "arg2"));
+}
