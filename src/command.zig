@@ -9,7 +9,7 @@ pub const App = struct {
     action: ?Action = null,
 
     help_config: HelpConfig = HelpConfig{
-        .color = .Auto,
+        .color_usage = .Auto,
     },
 };
 
@@ -20,7 +20,10 @@ pub const ColorUsage = enum {
 };
 
 pub const HelpConfig = struct {
-    color: ColorUsage,
+    color_usage: ColorUsage = .Auto,
+    color_section: []const u8 = "33;1",
+    color_option: []const u8 = "32",
+    color_error: []const u8 = "31;1",
 };
 
 pub const Command = struct {

@@ -197,10 +197,9 @@ pub fn Parser(comptime Iterator: type) type {
         }
 
         fn fail(self: *const Self, comptime fmt: []const u8, args: anytype) void {
-            var p = Printer.init(std.io.getStdErr(), self.app.help_config.color);
+            var p = Printer.init(std.io.getStdErr(), self.app.help_config.color_usage);
 
-            const color_error = "31;1";
-            p.printInColor(color_error, "ERROR");
+            p.printInColor(self.app.help_config.color_error, "ERROR");
             p.format(": ", .{});
             p.format(fmt, args);
             p.write(&.{'\n'});

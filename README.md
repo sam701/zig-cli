@@ -34,9 +34,8 @@ var port = cli.Option{
     .help = "port to bind to",
     .value = cli.OptionValue{ .int = null },
 };
-var app = &cli.Command{
-    .name = "run",
-    .help = "run the server",
+var app = &cli.App{
+    .name = "awesome-app",
     .options = &.{&host, &port},
     .action = run_server,
 };
