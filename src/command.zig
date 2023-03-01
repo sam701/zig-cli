@@ -1,5 +1,28 @@
 const std = @import("std");
 
+pub const App = struct {
+    name: []const u8,
+    description: ?[]const u8 = null,
+    version: ?[]const u8 = null,
+    options: ?[]const *Option = null,
+    subcommands: ?[]const *const Command = null,
+    action: ?Action = null,
+
+    help_config: HelpConfig = HelpConfig{
+        .color = .Auto,
+    },
+};
+
+pub const ColorUsage = enum {
+    Always,
+    Never,
+    Auto,
+};
+
+pub const HelpConfig = struct {
+    color: ColorUsage,
+};
+
 pub const Command = struct {
     name: []const u8,
     /// Detailed multiline command description

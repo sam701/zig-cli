@@ -34,10 +34,10 @@ var name_option = cli.Option{
     .help = "long_name help",
     .value = cli.OptionValue{ .string = null },
 };
-var app = &cli.Command{
+var app = &cli.App{
     .name = "simple",
-    .help = "this is a test command",
-    .description = "This is multiline command\ndescription.",
+    .description = "This a simple CLI app\nEnjoy!",
+    .version = "0.10.3",
     .subcommands = &.{&cli.Command{
         .name = "sub1",
         .help = "another awesome command",

@@ -24,12 +24,12 @@ const StringSliceIterator = struct {
     }
 };
 
-fn run(cmd: *command.Command, items: []const []const u8) !ParseResult {
+fn run(app: *command.App, items: []const []const u8) !ParseResult {
     var it = StringSliceIterator{
         .items = items,
     };
 
-    var parser = try Parser(StringSliceIterator).init(cmd, it, alloc);
+    var parser = try Parser(StringSliceIterator).init(app, it, alloc);
     var result = try parser.parse();
     parser.deinit();
     return result;
@@ -43,10 +43,9 @@ test "long option" {
         .help = "option aa",
         .value = command.OptionValue{ .string = null },
     };
-    var cmd = command.Command{
+    var cmd = command.App{
         .name = "abc",
         .options = &.{&opt},
-        .help = "help",
         .action = dummy_action,
     };
 
@@ -64,17 +63,16 @@ test "short option" {
         .help = "option aa",
         .value = command.OptionValue{ .string = null },
     };
-    var cmd = command.Command{
+    var app = command.App{
         .name = "abc",
         .options = &.{&opt},
-        .help = "help",
         .action = dummy_action,
     };
 
-    _ = try run(&cmd, &.{ "abc", "-a", "val" });
+    _ = try run(&app, &.{ "abc", "-a", "val" });
     try expect(std.mem.eql(u8, opt.value.string.?, "val"));
 
-    _ = try run(&cmd, &.{ "abc", "-a=bb" });
+    _ = try run(&app, &.{ "abc", "-a=bb" });
     try expect(std.mem.eql(u8, opt.value.string.?, "bb"));
 }
 
@@ -91,14 +89,13 @@ test "concatenated aliases" {
         .help = "option aa",
         .value = command.OptionValue{ .string = null },
     };
-    var cmd = command.Command{
+    var app = command.App{
         .name = "abc",
         .options = &.{ &bb, &opt },
-        .help = "help",
         .action = dummy_action,
     };
 
-    _ = try run(&cmd, &.{ "abc", "-ba", "val" });
+    _ = try run(&app, &.{ "abc", "-ba", "val" });
     try expect(std.mem.eql(u8, opt.value.string.?, "val"));
     try expect(bb.value.bool);
 }
@@ -114,14 +111,13 @@ test "int and float" {
         .help = "option bb",
         .value = command.OptionValue{ .float = null },
     };
-    var cmd = command.Command{
+    var app = command.App{
         .name = "abc",
         .options = &.{ &aa, &bb },
-        .help = "help",
         .action = dummy_action,
     };
 
-    _ = try run(&cmd, &.{ "abc", "--aa=34", "--bb", "15.25" });
+    _ = try run(&app, &.{ "abc", "--aa=34", "--bb", "15.25" });
     try expect(aa.value.int.? == 34);
     try expect(bb.value.float.? == 15.25);
 }
@@ -133,14 +129,13 @@ test "string list" {
         .help = "option aa",
         .value = command.OptionValue{ .string_list = null },
     };
-    var cmd = command.Command{
+    var app = command.App{
         .name = "abc",
         .options = &.{&aa},
-        .help = "help",
         .action = dummy_action,
     };
 
-    _ = try run(&cmd, &.{ "abc", "--aa=a1", "--aa", "a2", "-a", "a3", "-a=a4" });
+    _ = try run(&app, &.{ "abc", "--aa=a1", "--aa", "a2", "-a", "a3", "-a=a4" });
     try expect(aa.value.string_list.?.len == 4);
     try expect(std.mem.eql(u8, aa.value.string_list.?[0], "a1"));
     try expect(std.mem.eql(u8, aa.value.string_list.?[1], "a2"));
@@ -162,14 +157,13 @@ test "mix positional arguments and options" {
         .help = "option bb",
         .value = command.OptionValue{ .string = null },
     };
-    var cmd = command.Command{
+    var app = command.App{
         .name = "abc",
         .options = &.{ &aa, &bb },
-        .help = "help",
         .action = dummy_action,
     };
 
-    var result = try run(&cmd, &.{ "cmd", "--bb", "tt", "arg1", "-a", "val", "arg2", "--", "--arg3", "-arg4" });
+    var result = try run(&app, &.{ "cmd", "--bb", "tt", "arg1", "-a", "val", "arg2", "--", "--arg3", "-arg4" });
     defer std.testing.allocator.free(result.args);
     try expect(std.mem.eql(u8, aa.value.string.?, "val"));
     try expect(std.mem.eql(u8, bb.value.string.?, "tt"));

@@ -6,24 +6,34 @@ const color_section = "33;1";
 const color_options = "32";
 const color_clear = "0";
 
-pub fn print_command_help(current_command: *const command.Command, command_path: []const *const command.Command) !void {
+pub fn print_command_help(app: *const command.App, command_path: []const *const command.Command) !void {
     const stdout = std.io.getStdOut();
     var help_printer = HelpPrinter{
-        .printer = Printer.init(stdout),
+        .printer = Printer.init(stdout, app.help_config.color),
     };
-    help_printer.printCommandHelp(current_command, command_path);
+    if (command_path.len == 1) {
+        help_printer.printAppHelp(app, command_path);
+    } else {
+        help_printer.printCommandHelp(command_path);
+    }
 }
 
 const HelpPrinter = struct {
     printer: Printer,
 
-    fn printCommandHelp(self: *HelpPrinter, current_command: *const command.Command, command_path: []const *const command.Command) void {
+    fn printAppHelp(self: *HelpPrinter, app: *const command.App, command_path: []const *const command.Command) void {
+        self.printer.format("APP: {s}\n", .{app.name});
+        self.printCommandHelp(command_path);
+    }
+
+    fn printCommandHelp(self: *HelpPrinter, command_path: []const *const command.Command) void {
         self.printer.printInColor(color_section, "USAGE:");
         self.printer.format("\n  ", .{});
         self.printer.printColor(color_options);
         for (command_path) |cmd| {
             self.printer.format("{s} ", .{cmd.name});
         }
+        var current_command = command_path[command_path.len - 1];
         self.printer.format("{s} [OPTIONS]\n", .{current_command.name});
         self.printer.printColor(color_clear);
 

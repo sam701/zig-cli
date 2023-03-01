@@ -1,16 +1,21 @@
 const std = @import("std");
+const command = @import("./command.zig");
 
 const Self = @This();
 
 out: std.fs.File.Writer,
-has_tty: bool,
+use_color: bool,
 
 const color_clear = "0";
 
-pub fn init(file: std.fs.File) Self {
+pub fn init(file: std.fs.File, color: command.ColorUsage) Self {
     return .{
         .out = file.writer(),
-        .has_tty = std.os.isatty(file.handle),
+        .use_color = switch (color) {
+            .Always => true,
+            .Never => false,
+            .Auto => std.os.isatty(file.handle),
+        },
     };
 }
 
@@ -23,7 +28,7 @@ pub inline fn format(self: *Self, comptime text: []const u8, args: anytype) void
 }
 
 pub inline fn printColor(self: *Self, color: []const u8) void {
-    if (self.has_tty)
+    if (self.use_color)
         self.format("{c}[{s}m", .{ 0x1b, color });
 }
 
