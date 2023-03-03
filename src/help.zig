@@ -22,7 +22,17 @@ const HelpPrinter = struct {
     help_config: *const command.HelpConfig,
 
     fn printAppHelp(self: *HelpPrinter, app: *const command.App, command_path: []const *const command.Command) void {
-        self.printer.format("APP: {s}\n", .{app.name});
+        self.printer.printColor(self.help_config.color_app_name);
+        self.printer.format("{s}\n", .{app.name});
+        self.printer.printColor(color_clear);
+        if (app.version) |v| {
+            self.printer.format("Version: {s}\n", .{v});
+        }
+        if (app.author) |a| {
+            self.printer.format("Author: {s}\n", .{a});
+        }
+        self.printer.write("\n");
+
         self.printCommandHelp(command_path);
     }
 
@@ -37,7 +47,9 @@ const HelpPrinter = struct {
         self.printer.format("[OPTIONS]\n", .{});
         self.printer.printColor(color_clear);
 
-        self.printer.format("\n{s}\n", .{current_command.help});
+        if (command_path.len > 1) {
+            self.printer.format("\n{s}\n", .{current_command.help});
+        }
         if (current_command.description) |desc| {
             self.printer.format("\n{s}\n", .{desc});
         }

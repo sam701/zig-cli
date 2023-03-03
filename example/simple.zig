@@ -38,6 +38,7 @@ var app = &cli.App{
     .name = "simple",
     .description = "This a simple CLI app\nEnjoy!",
     .version = "0.10.3",
+    .author = "sam701 & contributors",
     .subcommands = &.{&cli.Command{
         .name = "sub1",
         .help = "another awesome command",

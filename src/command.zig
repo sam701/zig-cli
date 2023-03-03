@@ -4,6 +4,7 @@ pub const App = struct {
     name: []const u8,
     description: ?[]const u8 = null,
     version: ?[]const u8 = null,
+    author: ?[]const u8 = null,
     options: ?[]const *Option = null,
     subcommands: ?[]const *const Command = null,
     action: ?Action = null,
@@ -21,6 +22,7 @@ pub const ColorUsage = enum {
 
 pub const HelpConfig = struct {
     color_usage: ColorUsage = .Auto,
+    color_app_name: []const u8 = "33;1",
     color_section: []const u8 = "33;1",
     color_option: []const u8 = "32",
     color_error: []const u8 = "31;1",
