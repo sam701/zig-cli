@@ -9,19 +9,17 @@ pub const App = struct {
     subcommands: ?[]const *const Command = null,
     action: ?Action = null,
 
-    help_config: HelpConfig = HelpConfig{
-        .color_usage = .Auto,
-    },
+    help_config: HelpConfig = HelpConfig{},
 };
 
 pub const ColorUsage = enum {
-    Always,
-    Never,
-    Auto,
+    always,
+    never,
+    auto,
 };
 
 pub const HelpConfig = struct {
-    color_usage: ColorUsage = .Auto,
+    color_usage: ColorUsage = .auto,
     color_app_name: []const u8 = "33;1",
     color_section: []const u8 = "33;1",
     color_option: []const u8 = "32",

@@ -12,9 +12,9 @@ pub fn init(file: std.fs.File, color: command.ColorUsage) Self {
     return .{
         .out = file.writer(),
         .use_color = switch (color) {
-            .Always => true,
-            .Never => false,
-            .Auto => std.os.isatty(file.handle),
+            .always => true,
+            .never => false,
+            .auto => std.os.isatty(file.handle),
         },
     };
 }
