@@ -4,6 +4,9 @@ const cli = @import("zig-cli");
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 
+var abc: u16 = undefined;
+var wr = cli.AllocWrapper{ .alloc = allocator };
+
 var ip_option = cli.Option{
     .long_name = "ip",
     .help = "this is the IP address",
@@ -16,6 +19,8 @@ var int_option = cli.Option{
     .long_name = "int",
     .help = "this is an int",
     .value = cli.OptionValue{ .int = null },
+    .value_ref = cli.valueRef(&abc),
+    // .value_ref2 = wr.sigleInt(&abc),
 };
 var bool_option = cli.Option{
     .long_name = "bool",
@@ -64,6 +69,24 @@ var app = &cli.App{
 };
 
 pub fn main() anyerror!void {
+    // this works
+    // var a: u16 = 3;
+    // var p = cli.IntParser(u16);
+    // var t = cli.singleValueRef(u16, &a, p, allocator);
+    // try t.put("56");
+    // std.debug.print("a = {}\n", .{a});
+
+    // var ov = int_option.value_ref.?;
+    // std.log.info("hello", .{});
+    // try ov.set("44");
+    // std.log.debug("value: {}\n", .{abc});
+
+    // var ov = int_option;
+    // _ = ov;
+    // try ov.put("45");
+    var ov = try wr.sigleInt(&abc);
+    try ov.put("173");
+    std.log.debug("value: {}\n", .{abc});
     return cli.run(app, allocator);
 }
 
