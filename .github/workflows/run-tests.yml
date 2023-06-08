@@ -4,6 +4,9 @@ on:
     branches:
       - '**'
   pull_request: {}
+  schedule:
+    - cron: 0 4 * * 2
+
 jobs:
   validate_and_test_010:
     runs-on: ubuntu-latest
@@ -14,6 +17,7 @@ jobs:
           version: 0.10.1
       - run: zig fmt --check *.zig src/*.zig
       - run: zig build test
+
   validate_and_test_master:
     runs-on: ubuntu-latest
     steps:

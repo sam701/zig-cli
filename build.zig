@@ -38,7 +38,7 @@ pub fn build_010(b: *Bb) void {
     b.default_step.dependOn(&short.step);
 }
 
-pub fn build_011(b: *Bb) void {
+pub fn build_011(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
@@ -59,9 +59,9 @@ pub fn build_011(b: *Bb) void {
         .target = target,
         .optimize = optimize,
     });
-
+    const run_tests = b.addRunArtifact(main_tests);
     const test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&main_tests.step);
+    test_step.dependOn(&run_tests.step);
 
     const simple = b.addExecutable(.{
         .name = "simple",
