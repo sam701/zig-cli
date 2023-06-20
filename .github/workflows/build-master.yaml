@@ -5,7 +5,7 @@ on:
       - '**'
   pull_request: {}
   schedule:
-    - cron: 0 4 * * 2
+    - cron: 0 4 * * *
 
 jobs:
   validate_and_test_master:
