@@ -93,13 +93,13 @@ pub fn Parser(comptime Iterator: type) type {
 
         fn finalize(self: *Self) !ParseResult {
             self.ensure_all_required_set(self.current_command());
-            var args = try toSlice([]const u8, &self.captured_arguments);
+            var args = try self.captured_arguments.toOwnedSlice();
 
             if (self.value_lists) |vl| {
                 var it = vl.iterator();
                 while (it.next()) |entry| {
                     var option: *command.Option = entry.key_ptr.*;
-                    option.value.string_list = try toSlice([]const u8, entry.value_ptr);
+                    option.value.string_list = try entry.value_ptr.toOwnedSlice();
                 }
                 self.value_lists.?.deinit();
             }
@@ -146,7 +146,7 @@ pub fn Parser(comptime Iterator: type) type {
             };
 
             if (opt == &help_option) {
-                try help.print_command_help(self.app, try toSlice(*const command.Command, &self.command_path));
+                try help.print_command_help(self.app, try self.command_path.toOwnedSlice());
                 std.os.exit(0);
             }
 
@@ -291,8 +291,4 @@ fn find_subcommand(cmd: *const command.Command, subcommand_name: []const u8) ?*c
         }
     }
     return null;
-}
-
-fn toSlice(comptime T: type, arr: *std.ArrayList(T)) ![]T {
-    return arr.toOwnedSlice();
 }

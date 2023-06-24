@@ -59,7 +59,7 @@ const HelpPrinter = struct {
 
             var max_cmd_width: usize = 0;
             for (sc_list) |sc| {
-                max_cmd_width = std.math.max(max_cmd_width, sc.name.len);
+                max_cmd_width = @max(max_cmd_width, sc.name.len);
             }
             const cmd_column_width = max_cmd_width + 3;
             for (sc_list) |sc| {
@@ -82,7 +82,7 @@ const HelpPrinter = struct {
             var max_option_width: usize = 0;
             for (option_list) |option| {
                 var w = option.long_name.len + option.value_name.len + 3;
-                max_option_width = std.math.max(max_option_width, w);
+                max_option_width = @max(max_option_width, w);
             }
             option_column_width = max_option_width + 3;
             for (option_list) |option| {
