@@ -4,6 +4,11 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
+    _ = b.addModule("zig-cli", .{
+        .source_file = std.Build.FileSource.relative("src/main.zig"),
+        .dependencies = &[_]std.Build.ModuleDependency{},
+    });
+
     const lib = b.addStaticLibrary(.{
         .name = "zig-cli",
         .root_source_file = .{ .path = "src/main.zig" },
