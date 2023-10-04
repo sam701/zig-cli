@@ -68,7 +68,6 @@ fn primitiveTypeVTable(comptime T: anytype) *const ValueRef.VTable {
 
     std.debug.assert(ptr_info == .Pointer);
     std.debug.assert(ptr_info.Pointer.size == .One);
-    const alignment = ptr_info.Pointer.alignment;
     const childT = ptr_info.Pointer.child;
     const child_info = @typeInfo(childT);
 
@@ -77,7 +76,7 @@ fn primitiveTypeVTable(comptime T: anytype) *const ValueRef.VTable {
             const gen = struct {
                 fn setInt(ptr: *anyopaque, value: []const u8) anyerror!void {
                     var v = try std.fmt.parseInt(childT, value, 10);
-                    const p = @ptrCast(*childT, @alignCast(alignment, ptr));
+                    const p = @as(*childT, @ptrCast(@alignCast(ptr)));
                     p.* = v;
                 }
             };
@@ -145,14 +144,15 @@ pub const ValueRef2 = struct {
         std.debug.assert(ptr_info.Pointer.size == .One); // Must be a single-item pointer
 
         const alignment = ptr_info.Pointer.alignment;
+        _ = alignment;
 
         const gen = struct {
             fn putImpl(ptr: *anyopaque, value: []const u8) anyerror!void {
-                const self = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                const self = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 return @call(.{ .modifier = .always_inline }, putter, .{ self, value });
             }
             fn finalizerImpl(ptr: *anyopaque) anyerror!void {
-                const self = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                const self = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 return @call(.{ .modifier = .always_inline }, finalizer, .{self});
             }
 
@@ -217,7 +217,7 @@ pub fn singleValueRef(comptime T: type, dest: *T, parser: Parser(T), alloc: std.
 pub const AllocWrapper = struct {
     alloc: std.mem.Allocator,
 
-    pub fn sigleInt(self: *const AllocWrapper, dest: anytype) !ValueRef2 {
+    pub fn singleInt(self: *const AllocWrapper, dest: anytype) !ValueRef2 {
         const ti = @typeInfo(@TypeOf(dest));
         const parser = IntParser(ti.Pointer.child);
         return singleValueRef(ti.Pointer.child, dest, parser, self.alloc);

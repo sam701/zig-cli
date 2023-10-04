@@ -47,7 +47,7 @@ var app = &cli.App{
     .subcommands = &.{&cli.Command{
         .name = "sub1",
         .help = "another awesome command",
-        .description = 
+        .description =
         \\this is my awesome multiline description.
         \\This is already line 2.
         \\And this is line 3.
@@ -84,7 +84,7 @@ pub fn main() anyerror!void {
     // var ov = int_option;
     // _ = ov;
     // try ov.put("45");
-    var ov = try wr.sigleInt(&abc);
+    var ov = try wr.singleInt(&abc);
     try ov.put("173");
     std.log.debug("value: {}\n", .{abc});
     return cli.run(app, allocator);
