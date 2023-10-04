@@ -132,42 +132,6 @@ pub const ValueRef2 = struct {
         finalize: *const fn (impl_ptr: *anyopaque) anyerror!void,
     };
 
-    pub fn init(
-        impl_ptr: anytype,
-        comptime putter: *const fn (impl_ptr: @TypeOf(impl_ptr), value: []const u8) anyerror!void,
-        comptime finalizer: *const fn (impl_ptr: @TypeOf(impl_ptr)) anyerror!void,
-    ) Self {
-        const Ptr = @TypeOf(impl_ptr);
-        const ptr_info = @typeInfo(Ptr);
-
-        std.debug.assert(ptr_info == .Pointer); // Must be a pointer
-        std.debug.assert(ptr_info.Pointer.size == .One); // Must be a single-item pointer
-
-        const alignment = ptr_info.Pointer.alignment;
-        _ = alignment;
-
-        const gen = struct {
-            fn putImpl(ptr: *anyopaque, value: []const u8) anyerror!void {
-                const self = @as(Ptr, @ptrCast(@alignCast(ptr)));
-                return @call(.{ .modifier = .always_inline }, putter, .{ self, value });
-            }
-            fn finalizerImpl(ptr: *anyopaque) anyerror!void {
-                const self = @as(Ptr, @ptrCast(@alignCast(ptr)));
-                return @call(.{ .modifier = .always_inline }, finalizer, .{self});
-            }
-
-            const vtable = VTable{
-                .put = putImpl,
-                .finalize = finalizerImpl,
-            };
-        };
-
-        return .{
-            .impl_ptr = impl_ptr,
-            .vtable = &gen.vtable,
-        };
-    }
-
     pub fn put(self: *Self, value: []const u8) anyerror!void {
         return self.vtable.put(self.impl_ptr, value);
     }
@@ -198,10 +162,12 @@ pub fn singleValueRef(comptime T: type, dest: *T, parser: Parser(T), alloc: std.
 
         const Self = @This();
 
-        fn put(self: *Self, value: []const u8) anyerror!void {
+        fn put(ctx: *anyopaque, value: []const u8) anyerror!void {
+            const self: *Self = @ptrCast(@alignCast(ctx));
             try self.parser(self.dest, value);
         }
-        fn finalize(self: *Self) anyerror!void {
+        fn finalize(ctx: *anyopaque) anyerror!void {
+            const self: *Self = @ptrCast(@alignCast(ctx));
             self.alloc.destroy(self);
         }
     };
@@ -211,7 +177,10 @@ pub fn singleValueRef(comptime T: type, dest: *T, parser: Parser(T), alloc: std.
     im.parser = parser;
     im.alloc = alloc;
 
-    return ValueRef2.init(im, Impl.put, Impl.finalize);
+    return ValueRef2{ .impl_ptr = im, .vtable = &.{
+        .put = Impl.put,
+        .finalize = Impl.finalize,
+    } };
 }
 
 pub const AllocWrapper = struct {
