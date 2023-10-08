@@ -5,6 +5,8 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 
 var abc: u16 = undefined;
+var abc2: []const u8 = undefined;
+var abc3: []u16 = undefined;
 var wr = cli.AllocWrapper{ .alloc = allocator };
 
 var ip_option = cli.Option{
@@ -87,6 +89,17 @@ pub fn main() anyerror!void {
     var ov = try wr.singleInt(&abc);
     try ov.put("173");
     std.log.debug("value: {}\n", .{abc});
+
+    var a = try wr.string(&abc2);
+    try a.put("hello");
+    std.log.debug("value: {s}\n", .{abc2});
+
+    var a2 = try wr.multiInt(&abc3);
+    try a2.put("5");
+    try a2.put("10");
+    try a2.finalize();
+    std.log.debug("value: {any}\n", .{abc3});
+
     return cli.run(app, allocator);
 }
 

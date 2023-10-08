@@ -157,6 +157,14 @@ pub fn IntParser(comptime T: type) Parser(T) {
     }.parser;
 }
 
+pub fn StringParser(comptime T: type) Parser(T) {
+    return struct {
+        fn parser(dest: *T, value: []const u8) anyerror!void {
+            dest.* = value;
+        }
+    }.parser;
+}
+
 fn singleValueRef(comptime T: type, dest: *T, parser: Parser(T), alloc: std.mem.Allocator) !ValueRef2 {
     const Impl = struct {
         dest: *T,
@@ -192,10 +200,42 @@ fn singleValueRef(comptime T: type, dest: *T, parser: Parser(T), alloc: std.mem.
 }
 
 // TODO: implement multi-value reference, i.e. ref to a slice/array.
-pub fn sliceRef(comptime T: type, dest: *T, parser: Parser(T), alloc: std.mem.Allocator) !ValueRef2 {
-    _ = alloc;
-    _ = parser;
-    _ = dest;
+pub fn sliceRef(comptime T: type, dest: *[]T, parser: Parser(T), alloc: std.mem.Allocator) !ValueRef2 {
+    const List = std.ArrayList(T);
+    const Impl = struct {
+        dest: *[]T,
+        parser: Parser(T),
+        alloc: std.mem.Allocator,
+        list: List,
+
+        const Self = @This();
+
+        fn put(ctx: *anyopaque, value: []const u8) anyerror!void {
+            const self: *Self = @ptrCast(@alignCast(ctx));
+            var x: T = undefined;
+            try self.parser(&x, value);
+            try self.list.append(x);
+        }
+        fn finalize(ctx: *anyopaque) anyerror!void {
+            const self: *Self = @ptrCast(@alignCast(ctx));
+            self.dest.* = try self.list.toOwnedSlice();
+            self.alloc.destroy(self);
+        }
+    };
+
+    // FIXME: this must be destroyed
+    const im = try alloc.create(Impl);
+    im.* = .{
+        .dest = dest,
+        .parser = parser,
+        .alloc = alloc,
+        .list = List.init(alloc),
+    };
+
+    return ValueRef2{ .impl_ptr = im, .vtable = &.{
+        .put = Impl.put,
+        .finalize = Impl.finalize,
+    } };
 }
 
 pub const AllocWrapper = struct {
@@ -206,6 +246,18 @@ pub const AllocWrapper = struct {
     pub fn singleInt(self: *const AllocWrapper, dest: anytype) !ValueRef2 {
         const ti = @typeInfo(@TypeOf(dest));
         const parser = IntParser(ti.Pointer.child);
+        return singleValueRef(ti.Pointer.child, dest, parser, self.alloc);
+    }
+
+    pub fn multiInt(self: *const AllocWrapper, dest: anytype) !ValueRef2 {
+        // const ti = @typeInfo(@TypeOf(dest));
+        const parser = IntParser(u16);
+        return sliceRef(u16, dest, parser, self.alloc);
+    }
+
+    pub fn string(self: *const AllocWrapper, dest: anytype) !ValueRef2 {
+        const ti = @typeInfo(@TypeOf(dest));
+        const parser = StringParser(ti.Pointer.child);
         return singleValueRef(ti.Pointer.child, dest, parser, self.alloc);
     }
 
