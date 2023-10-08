@@ -58,6 +58,8 @@ pub const ValueRef = struct {
         set: Setter,
     };
 
+    // FIXME: a setter is not enough for multi-value options
+    /// Deprecated: use ValueRef2
     pub fn set(self: *ValueRef, value: []const u8) anyerror!void {
         return self.vtable.set(self.ptr, value);
     }
@@ -142,6 +144,7 @@ pub const ValueRef2 = struct {
 
 // const Parser = *const fn (dest: *anyopaque, value: []const u8) anyerror!void;
 fn Parser(comptime T: type) type {
+    // TODO: the parse function might need an allocator, e.g. to copy a string or allocate the destination type if it is a pointer.
     return *const fn (dest: *T, value: []const u8) anyerror!void;
 }
 
@@ -154,7 +157,7 @@ pub fn IntParser(comptime T: type) Parser(T) {
     }.parser;
 }
 
-pub fn singleValueRef(comptime T: type, dest: *T, parser: Parser(T), alloc: std.mem.Allocator) !ValueRef2 {
+fn singleValueRef(comptime T: type, dest: *T, parser: Parser(T), alloc: std.mem.Allocator) !ValueRef2 {
     const Impl = struct {
         dest: *T,
         parser: Parser(T),
@@ -168,14 +171,19 @@ pub fn singleValueRef(comptime T: type, dest: *T, parser: Parser(T), alloc: std.
         }
         fn finalize(ctx: *anyopaque) anyerror!void {
             const self: *Self = @ptrCast(@alignCast(ctx));
+
+            // TODO: clarify what to do with copied strings???
             self.alloc.destroy(self);
         }
     };
 
+    // FIXME: this must be destroyed
     const im = try alloc.create(Impl);
-    im.dest = dest;
-    im.parser = parser;
-    im.alloc = alloc;
+    im.* = .{
+        .dest = dest,
+        .parser = parser,
+        .alloc = alloc,
+    };
 
     return ValueRef2{ .impl_ptr = im, .vtable = &.{
         .put = Impl.put,
@@ -183,12 +191,24 @@ pub fn singleValueRef(comptime T: type, dest: *T, parser: Parser(T), alloc: std.
     } };
 }
 
+// TODO: implement multi-value reference, i.e. ref to a slice/array.
+pub fn sliceRef(comptime T: type, dest: *T, parser: Parser(T), alloc: std.mem.Allocator) !ValueRef2 {
+    _ = alloc;
+    _ = parser;
+    _ = dest;
+}
+
 pub const AllocWrapper = struct {
     alloc: std.mem.Allocator,
 
+    // TODO: make more generic to guess any value type (out of known), not only int
+    // TODO: consider parser registration for some type to allow to implement any possible parser
     pub fn singleInt(self: *const AllocWrapper, dest: anytype) !ValueRef2 {
         const ti = @typeInfo(@TypeOf(dest));
         const parser = IntParser(ti.Pointer.child);
         return singleValueRef(ti.Pointer.child, dest, parser, self.alloc);
     }
+
+    // TODO: consider arena allocator
+    // TODO: implement deinit
 };
