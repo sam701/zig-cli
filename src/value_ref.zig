@@ -13,6 +13,7 @@ pub const ValueRef = struct {
     pub fn put(self: *Self, value: []const u8, alloc: std.mem.Allocator) anyerror!void {
         switch (self.value_type) {
             .single => {
+                self.element_count += 1;
                 return self.value_data.value_parser(self.dest, value);
             },
             .multi => |*list| {
@@ -47,7 +48,7 @@ const ValueType = union(enum) {
 const AllocError = std.mem.Allocator.Error;
 pub const Error = AllocError; // | error{NotImplemented};
 
-pub fn valueRef(dest: anytype) ValueRef {
+pub fn mkRef(dest: anytype) ValueRef {
     const ti = @typeInfo(@TypeOf(dest));
     const t = ti.Pointer.child;
 
@@ -69,12 +70,12 @@ pub fn valueRef(dest: anytype) ValueRef {
                         };
                     }
                 },
-                else => @compileError("unsupported value type"),
+                else => @compileError("unsupported value type: only slices are supported"),
             }
         },
         else => {
             return ValueRef{
-                .dest = @ptrCast(dest),
+                .dest = dest,
                 .value_data = vp.getValueData(t),
                 .value_type = .single,
             };

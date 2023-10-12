@@ -99,7 +99,7 @@ const HelpPrinter = struct {
                 self.printer.format("--{s}", .{option.long_name});
                 self.printer.printColor(color_clear);
                 var width = option.long_name.len;
-                if (option.value != .bool) {
+                if (!option.value_ref.value_data.is_bool) {
                     self.printer.printColor(self.help_config.color_option);
                     self.printer.format(" <{s}>", .{option.value_name});
                     self.printer.printColor(color_clear);

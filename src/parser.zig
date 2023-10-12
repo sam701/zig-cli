@@ -5,6 +5,7 @@ const command = @import("command.zig");
 const help = @import("./help.zig");
 const argp = @import("./arg.zig");
 const Printer = @import("./Printer.zig");
+const mkRef = @import("./value_ref.zig").mkRef;
 
 pub const ParseResult = struct {
     action: command.Action,
@@ -22,15 +23,14 @@ pub fn run(app: *const command.App, alloc: Allocator) anyerror!void {
     return result.action(result.args);
 }
 
+var help_option_set: bool = false;
+
 var help_option = command.Option{
     .long_name = "help",
     .help = "Show this help output.",
     .short_alias = 'h',
-    .value = command.OptionValue{ .bool = false },
+    .value_ref = mkRef(&help_option_set),
 };
-
-const ValueList = std.ArrayList([]const u8);
-const ValueListMap = std.AutoHashMap(*command.Option, ValueList);
 
 pub fn Parser(comptime Iterator: type) type {
     return struct {
@@ -41,7 +41,6 @@ pub fn Parser(comptime Iterator: type) type {
         app: *const command.App,
         command_path: std.ArrayList(*const command.Command),
         captured_arguments: std.ArrayList([]const u8),
-        value_lists: ?ValueListMap,
 
         pub fn init(app: *const command.App, it: Iterator, alloc: Allocator) !Self {
             return Self{
@@ -50,7 +49,6 @@ pub fn Parser(comptime Iterator: type) type {
                 .app = app,
                 .command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16),
                 .captured_arguments = try std.ArrayList([]const u8).initCapacity(alloc, 16),
-                .value_lists = null,
             };
         }
 
@@ -95,13 +93,12 @@ pub fn Parser(comptime Iterator: type) type {
             self.ensure_all_required_set(self.current_command());
             var args = try self.captured_arguments.toOwnedSlice();
 
-            if (self.value_lists) |vl| {
-                var it = vl.iterator();
-                while (it.next()) |entry| {
-                    var option: *command.Option = entry.key_ptr.*;
-                    option.value.string_list = try entry.value_ptr.toOwnedSlice();
+            for (self.command_path.items) |cmd| {
+                if (cmd.options) |options| {
+                    for (options) |opt| {
+                        try opt.value_ref.finalize(self.alloc);
+                    }
                 }
-                self.value_lists.?.deinit();
             }
 
             if (self.current_command().action) |action| {
@@ -136,12 +133,12 @@ pub fn Parser(comptime Iterator: type) type {
             return self.arg_iterator.next();
         }
 
-        fn process_option(self: *Self, option: *const argp.OptionInterpretation) !void {
-            var opt: *command.Option = switch (option.option_type) {
-                .long => self.find_option_by_name(self.current_command(), option.name),
+        fn process_option(self: *Self, option_interpretation: *const argp.OptionInterpretation) !void {
+            var opt: *command.Option = switch (option_interpretation.option_type) {
+                .long => self.find_option_by_name(self.current_command(), option_interpretation.name),
                 .short => a: {
-                    self.set_boolean_options(self.current_command(), option.name[0 .. option.name.len - 1]);
-                    break :a self.find_option_by_alias(self.current_command(), option.name[option.name.len - 1]);
+                    self.set_concatenated_boolean_options(self.current_command(), option_interpretation.name[0 .. option_interpretation.name.len - 1]);
+                    break :a self.find_option_by_alias(self.current_command(), option_interpretation.name[option_interpretation.name.len - 1]);
                 },
             };
 
@@ -150,49 +147,18 @@ pub fn Parser(comptime Iterator: type) type {
                 std.os.exit(0);
             }
 
-            switch (opt.value) {
-                .bool => opt.value = command.OptionValue{ .bool = true },
-                else => {
-                    const arg = option.value orelse self.next_arg() orelse {
-                        self.fail("missing argument for {s}", .{opt.long_name});
-                        unreachable;
-                    };
-                    try self.parse_and_set_option_value(arg, opt);
-                },
-            }
-        }
-
-        fn parse_and_set_option_value(self: *Self, text: []const u8, option: *command.Option) !void {
-            switch (option.value) {
-                .bool => unreachable,
-                .string => option.value = command.OptionValue{ .string = text },
-                .int => {
-                    if (std.fmt.parseInt(i64, text, 10)) |iv| {
-                        option.value = command.OptionValue{ .int = iv };
-                    } else |_| {
-                        self.fail("option({s}): cannot parse int value", .{option.long_name});
-                        unreachable;
-                    }
-                },
-                .float => {
-                    if (std.fmt.parseFloat(f64, text)) |fv| {
-                        option.value = command.OptionValue{ .float = fv };
-                    } else |_| {
-                        self.fail("option({s}): cannot parse float value", .{option.long_name});
-                        unreachable;
-                    }
-                },
-                .string_list => {
-                    if (self.value_lists == null) {
-                        self.value_lists = ValueListMap.init(self.alloc);
-                    }
-
-                    var res = try self.value_lists.?.getOrPut(option);
-                    if (!res.found_existing) {
-                        res.value_ptr.* = try ValueList.initCapacity(self.alloc, 16);
-                    }
-                    try res.value_ptr.append(text);
-                },
+            if (opt.value_ref.value_data.is_bool) {
+                try opt.value_ref.put("true", self.alloc);
+                // TODO: bool argument can be explicitly passed as a value
+            } else {
+                const arg = option_interpretation.value orelse self.next_arg() orelse {
+                    self.fail("missing argument for {s}", .{opt.long_name});
+                    unreachable;
+                };
+                opt.value_ref.put(arg, self.alloc) catch |err| {
+                    self.fail("option({s}): cannot parse {s} value: {s}", .{ opt.long_name, opt.value_ref.value_data.type_name, @errorName(err) });
+                    unreachable;
+                };
             }
         }
 
@@ -250,11 +216,12 @@ pub fn Parser(comptime Iterator: type) type {
             }
         }
 
-        fn set_boolean_options(self: *const Self, cmd: *const command.Command, options: []const u8) void {
+        /// Set boolean options provided like `-acde`
+        fn set_concatenated_boolean_options(self: *const Self, cmd: *const command.Command, options: []const u8) void {
             for (options) |alias| {
                 var opt = self.find_option_by_alias(cmd, alias);
-                if (opt.value == command.OptionValue.bool) {
-                    opt.value.bool = true;
+                if (opt.value_ref.value_data.is_bool) {
+                    opt.value_ref.put("true", self.alloc) catch unreachable;
                 } else {
                     self.fail("'-{c}' is not a boolean option", .{alias});
                 }
@@ -264,17 +231,8 @@ pub fn Parser(comptime Iterator: type) type {
         fn ensure_all_required_set(self: *const Self, cmd: *const command.Command) void {
             if (cmd.options) |list| {
                 for (list) |option| {
-                    if (option.required) {
-                        var not_set = switch (option.value) {
-                            .bool => false,
-                            .string => |x| x == null,
-                            .int => |x| x == null,
-                            .float => |x| x == null,
-                            .string_list => |x| x == null,
-                        };
-                        if (not_set) {
-                            self.fail("missing required option '{s}'", .{option.long_name});
-                        }
+                    if (option.required and option.value_ref.element_count == 0) {
+                        self.fail("missing required option '{s}'", .{option.long_name});
                     }
                 }
             }

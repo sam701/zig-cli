@@ -5,46 +5,43 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 
 var config = struct {
-    host: []const u8 = "localhost",
-    port: u16 = 3000,
-    base_value: f64 = undefined,
-    expose_metrics: bool = false,
-    testar: []i32 = undefined,
+    ip: []const u8 = undefined,
+    int: i32 = undefined,
+    bool: bool = false,
+    float: f64 = 0.34,
+    name: []const u8 = undefined,
 }{};
 
-var host_option = cli.Option{
-    .long_name = "host",
-    .help = "host to listen on",
-    .short_alias = 'h',
-    .value = cli.OptionValue{ .string = null },
-    .value_ref = cli.valueRef(&config.host),
+var ip_option = cli.Option{
+    .long_name = "ip",
+    .help = "this is the IP address",
+    .short_alias = 'i',
+    .value_ref = cli.mkRef(&config.ip),
     .required = true,
     .value_name = "IP",
 };
-var port_option = cli.Option{
-    .long_name = "port",
-    .help = "post to bind to",
-    .value = cli.OptionValue{ .int = null },
-    .value_ref = cli.valueRef(&config.port),
+var int_option = cli.Option{
+    .long_name = "int",
+    .help = "this is an int",
+    .value_ref = cli.mkRef(&config.int),
 };
-var ar_option = cli.Option{
-    .long_name = "array",
-    .help = "slice test",
-    .value = cli.OptionValue{ .int = null },
-    .value_ref = cli.valueRef(&config.testar),
+var bool_option = cli.Option{
+    .long_name = "bool",
+    .short_alias = 'b',
+    .help = "this is a bool",
+    .value_ref = cli.mkRef(&config.bool),
 };
-var expose_metrics_option = cli.Option{
-    .long_name = "expose-metrics",
-    .short_alias = 'm',
-    .help = "if the metrics should be exposed",
-    .value = cli.OptionValue{ .bool = false },
-};
-var base_value_option = cli.Option{
-    .long_name = "base-value",
-    .help = "base value",
-    .value = cli.OptionValue{ .float = 0.34 },
+var float_option = cli.Option{
+    .long_name = "float",
+    .help = "this is a float",
+    .value_ref = cli.mkRef(&config.float),
 };
 
+var name_option = cli.Option{
+    .long_name = "long_name",
+    .help = "long_name help",
+    .value_ref = cli.mkRef(&config.name),
+};
 var app = &cli.App{
     .name = "simple",
     .description = "This a simple CLI app\nEnjoy!",
@@ -59,10 +56,10 @@ var app = &cli.App{
         \\And this is line 3.
         ,
         .options = &.{
-            &host_option,
-            &port_option,
-            &expose_metrics_option,
-            &base_value_option,
+            &ip_option,
+            &int_option,
+            &bool_option,
+            &float_option,
         },
         .subcommands = &.{
             &cli.Command{
@@ -75,21 +72,10 @@ var app = &cli.App{
 };
 
 pub fn main() anyerror!void {
-    try port_option.value_ref.?.put("356", allocator);
-    std.log.debug("port value = {}", .{config.port});
-
-    try host_option.value_ref.?.put("awesome.com", allocator);
-    std.log.debug("host value = {s}", .{config.host});
-
-    try ar_option.value_ref.?.put("45", allocator);
-    try ar_option.value_ref.?.put("94", allocator);
-    try ar_option.value_ref.?.put("23456789", allocator);
-    try ar_option.value_ref.?.finalize(allocator);
-    std.log.debug("testar value = {any}", .{config.testar});
     return cli.run(app, allocator);
 }
 
 fn run_sub2(args: []const []const u8) anyerror!void {
-    var ip = host_option.value.string.?;
-    std.log.debug("running sub2: ip={s}, bool={any}, float={any} arg_count={any}", .{ ip, expose_metrics_option.value.bool, base_value_option.value.float, args.len });
+    const c = &config;
+    std.log.debug("running sub2: ip={s}, bool={any}, float={any} arg_count={any}", .{ c.ip, c.bool, c.float, args.len });
 }
