@@ -1,7 +1,7 @@
 const std = @import("std");
 const vref = @import("./value_ref.zig");
 pub const ValueRef = vref.ValueRef;
-pub const Context = vref.Context;
+pub const valueRef = vref.valueRef;
 
 pub const App = struct {
     name: []const u8,

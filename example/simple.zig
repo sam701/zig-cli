@@ -9,6 +9,7 @@ var config = struct {
     port: u16 = 3000,
     base_value: f64 = undefined,
     expose_metrics: bool = false,
+    testar: []i32 = undefined,
 }{};
 
 var host_option = cli.Option{
@@ -16,6 +17,7 @@ var host_option = cli.Option{
     .help = "host to listen on",
     .short_alias = 'h',
     .value = cli.OptionValue{ .string = null },
+    .value_ref = cli.valueRef(&config.host),
     .required = true,
     .value_name = "IP",
 };
@@ -23,6 +25,13 @@ var port_option = cli.Option{
     .long_name = "port",
     .help = "post to bind to",
     .value = cli.OptionValue{ .int = null },
+    .value_ref = cli.valueRef(&config.port),
+};
+var ar_option = cli.Option{
+    .long_name = "array",
+    .help = "slice test",
+    .value = cli.OptionValue{ .int = null },
+    .value_ref = cli.valueRef(&config.testar),
 };
 var expose_metrics_option = cli.Option{
     .long_name = "expose-metrics",
@@ -66,16 +75,17 @@ var app = &cli.App{
 };
 
 pub fn main() anyerror!void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    // defer arena.deinit();
-    const al = arena.allocator();
+    try port_option.value_ref.?.put("356", allocator);
+    std.log.debug("port value = {}", .{config.port});
 
-    var ctx = cli.Context.init(al);
-    host_option.value_ref = try ctx.valueRef(&config.host);
-    port_option.value_ref = try ctx.valueRef(&config.port);
-    expose_metrics_option.value_ref = try ctx.valueRef(&config.expose_metrics);
-    base_value_option.value_ref = try ctx.valueRef(&config.base_value);
+    try host_option.value_ref.?.put("awesome.com", allocator);
+    std.log.debug("host value = {s}", .{config.host});
 
+    try ar_option.value_ref.?.put("45", allocator);
+    try ar_option.value_ref.?.put("94", allocator);
+    try ar_option.value_ref.?.put("23456789", allocator);
+    try ar_option.value_ref.?.finalize(allocator);
+    std.log.debug("testar value = {any}", .{config.testar});
     return cli.run(app, allocator);
 }
 
