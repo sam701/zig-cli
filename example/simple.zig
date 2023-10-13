@@ -9,7 +9,6 @@ var config = struct {
     int: i32 = undefined,
     bool: bool = false,
     float: f64 = 0.34,
-    name: []const u8 = undefined,
 }{};
 
 var ip_option = cli.Option{
@@ -37,11 +36,6 @@ var float_option = cli.Option{
     .value_ref = cli.mkRef(&config.float),
 };
 
-var name_option = cli.Option{
-    .long_name = "long_name",
-    .help = "long_name help",
-    .value_ref = cli.mkRef(&config.name),
-};
 var app = &cli.App{
     .name = "simple",
     .description = "This a simple CLI app\nEnjoy!",

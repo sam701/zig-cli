@@ -10,9 +10,13 @@ pub const ValueData = struct {
 };
 
 pub fn getValueData(comptime T: type) ValueData {
-    return switch (@typeInfo(T)) {
-        .Int => intData(T),
-        .Float => floatData(T),
+    const ValueType = switch (@typeInfo(T)) {
+        .Optional => |oinfo| oinfo.child,
+        else => T,
+    };
+    return switch (@typeInfo(ValueType)) {
+        .Int => intData(ValueType, T),
+        .Float => floatData(ValueType, T),
         .Bool => boolData(T),
         .Pointer => |pinfo| {
             if (pinfo.size == .Slice and pinfo.child == u8) {
@@ -23,39 +27,39 @@ pub fn getValueData(comptime T: type) ValueData {
     };
 }
 
-fn intData(comptime T: type) ValueData {
+fn intData(comptime ValueType: type, comptime DestinationType: type) ValueData {
     return .{
-        .value_size = @sizeOf(T),
+        .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
             fn parser(dest: *anyopaque, value: []const u8) anyerror!void {
-                const dt: *T = @ptrCast(@alignCast(dest));
-                dt.* = try std.fmt.parseInt(T, value, 10);
+                const dt: *DestinationType = @ptrCast(@alignCast(dest));
+                dt.* = try std.fmt.parseInt(ValueType, value, 10);
             }
         }.parser,
         .type_name = "integer",
     };
 }
 
-fn floatData(comptime T: type) ValueData {
+fn floatData(comptime ValueType: type, comptime DestinationType: type) ValueData {
     return .{
-        .value_size = @sizeOf(T),
+        .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
             fn parser(dest: *anyopaque, value: []const u8) anyerror!void {
-                const dt: *T = @ptrCast(@alignCast(dest));
-                dt.* = try std.fmt.parseFloat(T, value);
+                const dt: *DestinationType = @ptrCast(@alignCast(dest));
+                dt.* = try std.fmt.parseFloat(ValueType, value);
             }
         }.parser,
         .type_name = "float",
     };
 }
 
-fn boolData(comptime T: type) ValueData {
+fn boolData(comptime DestinationType: type) ValueData {
     return .{
-        .value_size = @sizeOf(T),
+        .value_size = @sizeOf(DestinationType),
         .is_bool = true,
         .value_parser = struct {
             fn parser(dest: *anyopaque, value: []const u8) anyerror!void {
-                const dt: *T = @ptrCast(@alignCast(dest));
+                const dt: *DestinationType = @ptrCast(@alignCast(dest));
                 dt.* = std.mem.eql(u8, value, "true");
             }
         }.parser,
@@ -63,12 +67,12 @@ fn boolData(comptime T: type) ValueData {
     };
 }
 
-fn stringData(comptime T: type) ValueData {
+fn stringData(comptime DestinationType: type) ValueData {
     return .{
-        .value_size = @sizeOf(T),
+        .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
             fn parser(dest: *anyopaque, value: []const u8) anyerror!void {
-                const dt: *T = @ptrCast(@alignCast(dest));
+                const dt: *DestinationType = @ptrCast(@alignCast(dest));
                 dt.* = value;
             }
         }.parser,
