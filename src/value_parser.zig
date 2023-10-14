@@ -32,7 +32,7 @@ fn intData(comptime ValueType: type, comptime DestinationType: type) ValueData {
         .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
             fn parser(dest: *anyopaque, value: []const u8) anyerror!void {
-                const dt: *DestinationType = @ptrCast(@alignCast(dest));
+                const dt: *DestinationType = @alignCast(@ptrCast(dest));
                 dt.* = try std.fmt.parseInt(ValueType, value, 10);
             }
         }.parser,

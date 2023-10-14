@@ -1,6 +1,7 @@
 const std = @import("std");
 const command = @import("./command.zig");
 const vp = @import("./value_parser.zig");
+const Allocator = std.mem.Allocator;
 
 pub const ValueRef = struct {
     dest: *anyopaque,
@@ -10,31 +11,30 @@ pub const ValueRef = struct {
 
     const Self = @This();
 
-    pub fn put(self: *Self, value: []const u8, alloc: std.mem.Allocator) anyerror!void {
+    pub fn put(self: *Self, value: []const u8, alloc: Allocator) anyerror!void {
+        self.element_count += 1;
         switch (self.value_type) {
             .single => {
-                self.element_count += 1;
                 return self.value_data.value_parser(self.dest, value);
             },
             .multi => |*list| {
-                self.element_count += 1;
-                try list.ensureTotalCapacity(alloc, self.element_count * self.value_data.value_size);
-                const value_ptr = list.items.ptr + ((self.element_count - 1) * self.value_data.value_size);
+                if (list.list_ptr == null) {
+                    list.list_ptr = try list.vtable.createList(alloc);
+                }
+                var value_ptr = try list.vtable.addOne(list.list_ptr.?, alloc);
                 try self.value_data.value_parser(value_ptr, value);
-                list.items.len += self.value_data.value_size;
             },
         }
     }
 
-    pub fn finalize(self: *Self, alloc: std.mem.Allocator) anyerror!void {
+    pub fn finalize(self: *Self, alloc: Allocator) anyerror!void {
         switch (self.value_type) {
             .single => {},
             .multi => |*list| {
-                var sl = try list.toOwnedSlice(alloc);
-                sl.len = self.element_count;
-
-                var dest: *[]u8 = @alignCast(@ptrCast(self.dest));
-                dest.* = sl;
+                if (list.list_ptr == null) {
+                    list.list_ptr = try list.vtable.createList(alloc);
+                }
+                try list.vtable.finalize(list.list_ptr.?, self.dest, alloc);
             },
         }
     }
@@ -42,10 +42,10 @@ pub const ValueRef = struct {
 
 const ValueType = union(enum) {
     single,
-    multi: std.ArrayListUnmanaged(u8),
+    multi: ValueList,
 };
 
-const AllocError = std.mem.Allocator.Error;
+const AllocError = Allocator.Error;
 pub const Error = AllocError; // | error{NotImplemented};
 
 pub fn mkRef(dest: anytype) ValueRef {
@@ -66,7 +66,7 @@ pub fn mkRef(dest: anytype) ValueRef {
                         return ValueRef{
                             .dest = @ptrCast(dest),
                             .value_data = vp.getValueData(pinfo.child),
-                            .value_type = ValueType{ .multi = std.ArrayListUnmanaged(u8){} },
+                            .value_type = ValueType{ .multi = ValueList.init(pinfo.child) },
                         };
                     }
                 },
@@ -82,3 +82,40 @@ pub fn mkRef(dest: anytype) ValueRef {
         },
     }
 }
+
+const ValueList = struct {
+    list_ptr: ?*anyopaque = null,
+    vtable: VTable,
+
+    const VTable = struct {
+        createList: *const fn (Allocator) anyerror!*anyopaque,
+        addOne: *const fn (list_ptr: *anyopaque, alloc: Allocator) anyerror!*anyopaque,
+        finalize: *const fn (list_ptr: *anyopaque, dest: *anyopaque, alloc: Allocator) anyerror!void,
+    };
+
+    fn init(comptime T: type) ValueList {
+        const List = std.ArrayListUnmanaged(T);
+        const gen = struct {
+            fn createList(alloc: Allocator) anyerror!*anyopaque {
+                var list = try alloc.create(List);
+                list.* = List{};
+                return list;
+            }
+            fn addOne(list_ptr: *anyopaque, alloc: Allocator) anyerror!*anyopaque {
+                const list: *List = @alignCast(@ptrCast(list_ptr));
+                return @ptrCast(try list.addOne(alloc));
+            }
+            fn finalize(list_ptr: *anyopaque, dest: *anyopaque, alloc: Allocator) anyerror!void {
+                const list: *List = @alignCast(@ptrCast(list_ptr));
+                var destSlice: *[]T = @alignCast(@ptrCast(dest));
+                destSlice.* = try list.toOwnedSlice(alloc);
+                alloc.destroy(list);
+            }
+        };
+        return ValueList{ .vtable = VTable{
+            .createList = gen.createList,
+            .addOne = gen.addOne,
+            .finalize = gen.finalize,
+        } };
+    }
+};
