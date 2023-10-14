@@ -129,6 +129,38 @@ test "int and float" {
     try expect(15.25 == bb);
 }
 
+test "optional values" {
+    var aa: ?i32 = null;
+    var bb: ?f32 = 500;
+    var cc: ?f32 = null;
+
+    var aa_opt = command.Option{
+        .long_name = "aa",
+        .help = "option aa",
+        .value_ref = mkRef(&aa),
+    };
+    var bb_opt = command.Option{
+        .long_name = "bb",
+        .help = "option bb",
+        .value_ref = mkRef(&bb),
+    };
+    var cc_opt = command.Option{
+        .long_name = "cc",
+        .help = "option cc",
+        .value_ref = mkRef(&cc),
+    };
+    var app = command.App{
+        .name = "abc",
+        .options = &.{ &aa_opt, &bb_opt, &cc_opt },
+        .action = dummy_action,
+    };
+
+    _ = try run(&app, &.{ "abc", "--aa=34", "--bb", "15.25" });
+    try expect(34 == aa.?);
+    try expect(15.25 == bb.?);
+    try std.testing.expect(cc == null);
+}
+
 test "int list" {
     var aa: []u64 = undefined;
     var aa_opt = command.Option{
