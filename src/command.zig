@@ -1,4 +1,6 @@
 const std = @import("std");
+const vref = @import("./value_ref.zig");
+pub const ValueRef = vref.ValueRef;
 
 pub const App = struct {
     name: []const u8,
@@ -39,19 +41,11 @@ pub const Command = struct {
 
 pub const Action = *const fn (args: []const []const u8) anyerror!void;
 
-pub const OptionValue = union(enum) {
-    bool: bool,
-    string: ?[]const u8,
-    int: ?i64,
-    float: ?f64,
-    string_list: ?[]const []const u8,
-};
-
 pub const Option = struct {
     long_name: []const u8,
     short_alias: ?u8 = null,
     help: []const u8,
     required: bool = false,
-    value: OptionValue,
+    value_ref: ValueRef,
     value_name: []const u8 = "VALUE",
 };

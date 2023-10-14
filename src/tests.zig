@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 
 const command = @import("./command.zig");
 const ppack = @import("./parser.zig");
+const mkRef = @import("./value_ref.zig").mkRef;
 const Parser = ppack.Parser;
 const ParseResult = ppack.ParseResult;
 
@@ -38,10 +39,11 @@ fn run(app: *command.App, items: []const []const u8) !ParseResult {
 fn dummy_action(_: []const []const u8) !void {}
 
 test "long option" {
+    var aa: []const u8 = "test";
     var opt = command.Option{
         .long_name = "aa",
         .help = "option aa",
-        .value = command.OptionValue{ .string = null },
+        .value_ref = mkRef(&aa),
     };
     var cmd = command.App{
         .name = "abc",
@@ -50,18 +52,19 @@ test "long option" {
     };
 
     _ = try run(&cmd, &.{ "cmd", "--aa", "val" });
-    try expect(std.mem.eql(u8, opt.value.string.?, "val"));
+    try std.testing.expectEqualStrings("val", aa);
 
     _ = try run(&cmd, &.{ "cmd", "--aa=bb" });
-    try expect(std.mem.eql(u8, opt.value.string.?, "bb"));
+    try std.testing.expectEqualStrings("bb", aa);
 }
 
 test "short option" {
+    var aa: []const u8 = undefined;
     var opt = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
-        .value = command.OptionValue{ .string = null },
+        .value_ref = mkRef(&aa),
     };
     var app = command.App{
         .name = "abc",
@@ -70,92 +73,156 @@ test "short option" {
     };
 
     _ = try run(&app, &.{ "abc", "-a", "val" });
-    try expect(std.mem.eql(u8, opt.value.string.?, "val"));
+    try std.testing.expectEqualStrings("val", aa);
 
     _ = try run(&app, &.{ "abc", "-a=bb" });
-    try expect(std.mem.eql(u8, opt.value.string.?, "bb"));
+    try std.testing.expectEqualStrings("bb", aa);
 }
 
 test "concatenated aliases" {
-    var bb = command.Option{
+    var aa: []const u8 = undefined;
+    var bb: bool = false;
+    var bbopt = command.Option{
         .long_name = "bb",
         .short_alias = 'b',
         .help = "option bb",
-        .value = command.OptionValue{ .bool = false },
+        .value_ref = mkRef(&bb),
     };
     var opt = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
-        .value = command.OptionValue{ .string = null },
+        .value_ref = mkRef(&aa),
     };
     var app = command.App{
         .name = "abc",
-        .options = &.{ &bb, &opt },
+        .options = &.{ &bbopt, &opt },
         .action = dummy_action,
     };
 
     _ = try run(&app, &.{ "abc", "-ba", "val" });
-    try expect(std.mem.eql(u8, opt.value.string.?, "val"));
-    try expect(bb.value.bool);
+    try std.testing.expectEqualStrings("val", aa);
+    try expect(bb);
 }
 
 test "int and float" {
-    var aa = command.Option{
+    var aa: i32 = undefined;
+    var bb: f64 = undefined;
+    var aa_opt = command.Option{
         .long_name = "aa",
         .help = "option aa",
-        .value = command.OptionValue{ .int = null },
+        .value_ref = mkRef(&aa),
     };
-    var bb = command.Option{
+    var bb_opt = command.Option{
         .long_name = "bb",
         .help = "option bb",
-        .value = command.OptionValue{ .float = null },
+        .value_ref = mkRef(&bb),
     };
     var app = command.App{
         .name = "abc",
-        .options = &.{ &aa, &bb },
+        .options = &.{ &aa_opt, &bb_opt },
         .action = dummy_action,
     };
 
     _ = try run(&app, &.{ "abc", "--aa=34", "--bb", "15.25" });
-    try expect(aa.value.int.? == 34);
-    try expect(bb.value.float.? == 15.25);
+    try expect(34 == aa);
+    try expect(15.25 == bb);
 }
 
-test "string list" {
-    var aa = command.Option{
+test "optional values" {
+    var aa: ?i32 = null;
+    var bb: ?f32 = 500;
+    var cc: ?f32 = null;
+
+    var aa_opt = command.Option{
         .long_name = "aa",
-        .short_alias = 'a',
         .help = "option aa",
-        .value = command.OptionValue{ .string_list = null },
+        .value_ref = mkRef(&aa),
+    };
+    var bb_opt = command.Option{
+        .long_name = "bb",
+        .help = "option bb",
+        .value_ref = mkRef(&bb),
+    };
+    var cc_opt = command.Option{
+        .long_name = "cc",
+        .help = "option cc",
+        .value_ref = mkRef(&cc),
     };
     var app = command.App{
         .name = "abc",
-        .options = &.{&aa},
+        .options = &.{ &aa_opt, &bb_opt, &cc_opt },
+        .action = dummy_action,
+    };
+
+    _ = try run(&app, &.{ "abc", "--aa=34", "--bb", "15.25" });
+    try expect(34 == aa.?);
+    try expect(15.25 == bb.?);
+    try std.testing.expect(cc == null);
+}
+
+test "int list" {
+    var aa: []u64 = undefined;
+    var aa_opt = command.Option{
+        .long_name = "aa",
+        .short_alias = 'a',
+        .help = "option aa",
+        .value_ref = mkRef(&aa),
+    };
+    var app = command.App{
+        .name = "abc",
+        .options = &.{&aa_opt},
+        .action = dummy_action,
+    };
+
+    _ = try run(&app, &.{ "abc", "--aa=100", "--aa", "200", "-a", "300", "-a=400" });
+    try expect(aa.len == 4);
+    try expect(aa[0] == 100);
+    try expect(aa[1] == 200);
+    try expect(aa[2] == 300);
+    try expect(aa[3] == 400);
+
+    // FIXME: it tries to deallocated u64 while the memory was allocated using u8 alignment
+    alloc.free(aa);
+}
+
+test "string list" {
+    var aa: [][]const u8 = undefined;
+    var aa_opt = command.Option{
+        .long_name = "aa",
+        .short_alias = 'a',
+        .help = "option aa",
+        .value_ref = mkRef(&aa),
+    };
+    var app = command.App{
+        .name = "abc",
+        .options = &.{&aa_opt},
         .action = dummy_action,
     };
 
     _ = try run(&app, &.{ "abc", "--aa=a1", "--aa", "a2", "-a", "a3", "-a=a4" });
-    try expect(aa.value.string_list.?.len == 4);
-    try expect(std.mem.eql(u8, aa.value.string_list.?[0], "a1"));
-    try expect(std.mem.eql(u8, aa.value.string_list.?[1], "a2"));
-    try expect(std.mem.eql(u8, aa.value.string_list.?[2], "a3"));
-    try expect(std.mem.eql(u8, aa.value.string_list.?[3], "a4"));
+    try expect(aa.len == 4);
+    try std.testing.expectEqualStrings("a1", aa[0]);
+    try std.testing.expectEqualStrings("a2", aa[1]);
+    try std.testing.expectEqualStrings("a3", aa[2]);
+    try std.testing.expectEqualStrings("a4", aa[3]);
 
-    alloc.free(aa.value.string_list.?);
+    alloc.free(aa);
 }
 
 test "mix positional arguments and options" {
+    var aav: []const u8 = undefined;
+    var bbv: []const u8 = undefined;
     var aa = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
-        .value = command.OptionValue{ .string = null },
+        .value_ref = mkRef(&aav),
     };
     var bb = command.Option{
         .long_name = "bb",
         .help = "option bb",
-        .value = command.OptionValue{ .string = null },
+        .value_ref = mkRef(&bbv),
     };
     var app = command.App{
         .name = "abc",
@@ -165,11 +232,11 @@ test "mix positional arguments and options" {
 
     var result = try run(&app, &.{ "cmd", "--bb", "tt", "arg1", "-a", "val", "arg2", "--", "--arg3", "-arg4" });
     defer std.testing.allocator.free(result.args);
-    try expect(std.mem.eql(u8, aa.value.string.?, "val"));
-    try expect(std.mem.eql(u8, bb.value.string.?, "tt"));
+    try std.testing.expectEqualStrings("val", aav);
+    try std.testing.expectEqualStrings("tt", bbv);
     try expect(result.args.len == 4);
-    try expect(std.mem.eql(u8, result.args[0], "arg1"));
-    try expect(std.mem.eql(u8, result.args[1], "arg2"));
-    try expect(std.mem.eql(u8, result.args[2], "--arg3"));
-    try expect(std.mem.eql(u8, result.args[3], "-arg4"));
+    try std.testing.expectEqualStrings("arg1", result.args[0]);
+    try std.testing.expectEqualStrings("arg2", result.args[1]);
+    try std.testing.expectEqualStrings("--arg3", result.args[2]);
+    try std.testing.expectEqualStrings("-arg4", result.args[3]);
 }

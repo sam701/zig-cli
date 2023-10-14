@@ -5,6 +5,7 @@ A simple package for building command line apps in Zig.
 Inspired by [urfave/cli](https://github.com/urfave/cli) Go package.
 
 ## Features
+* command line arguments are parsed into zig values
 * long and short options: `--option1`, `-o`
 * optional `=` sign: `--address=127.0.0.1` equals `--address 127.0.0.1`
 * concatenated short options: `-a -b -c` equals `-abc`
@@ -24,19 +25,25 @@ const cli = @import("zig-cli");
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 
+var config = struct {
+    host: []const u8 = "localhost",
+    port: u16 = undefined,
+}{};
+
 var host = cli.Option{
     .long_name = "host",
     .help = "host to listen on",
-    .value = cli.OptionValue{ .string = null },
+    .value_ref = cli.mkRef(&config.host),
 };
 var port = cli.Option{
     .long_name = "port",
     .help = "port to bind to",
-    .value = cli.OptionValue{ .int = null },
+    .required = true,
+    .value_ref = cli.mkRef(&config.port),
 };
 var app = &cli.App{
-    .name = "awesome-app",
-    .options = &.{&host, &port},
+    .name = "short",
+    .options = &.{ &host, &port },
     .action = run_server,
 };
 
@@ -45,9 +52,7 @@ pub fn main() !void {
 }
 
 fn run_server(_: []const []const u8) !void {
-    var h = host.value.string.?;
-    var p = port.value.int.?;
-    std.log.debug("server is listening on {s}:{any}", .{ h, p });
+    std.log.debug("server is listening on {s}:{}", .{ config.host, config.port });
 }
 ```
 

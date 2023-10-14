@@ -4,36 +4,38 @@ const cli = @import("zig-cli");
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 
+var config = struct {
+    ip: []const u8 = undefined,
+    int: i32 = undefined,
+    bool: bool = false,
+    float: f64 = 0.34,
+}{};
+
 var ip_option = cli.Option{
     .long_name = "ip",
     .help = "this is the IP address",
     .short_alias = 'i',
-    .value = cli.OptionValue{ .string = null },
+    .value_ref = cli.mkRef(&config.ip),
     .required = true,
     .value_name = "IP",
 };
 var int_option = cli.Option{
     .long_name = "int",
     .help = "this is an int",
-    .value = cli.OptionValue{ .int = null },
+    .value_ref = cli.mkRef(&config.int),
 };
 var bool_option = cli.Option{
     .long_name = "bool",
     .short_alias = 'b',
     .help = "this is a bool",
-    .value = cli.OptionValue{ .bool = false },
+    .value_ref = cli.mkRef(&config.bool),
 };
 var float_option = cli.Option{
     .long_name = "float",
     .help = "this is a float",
-    .value = cli.OptionValue{ .float = 0.34 },
+    .value_ref = cli.mkRef(&config.float),
 };
 
-var name_option = cli.Option{
-    .long_name = "long_name",
-    .help = "long_name help",
-    .value = cli.OptionValue{ .string = null },
-};
 var app = &cli.App{
     .name = "simple",
     .description = "This a simple CLI app\nEnjoy!",
@@ -42,7 +44,7 @@ var app = &cli.App{
     .subcommands = &.{&cli.Command{
         .name = "sub1",
         .help = "another awesome command",
-        .description = 
+        .description =
         \\this is my awesome multiline description.
         \\This is already line 2.
         \\And this is line 3.
@@ -68,6 +70,6 @@ pub fn main() anyerror!void {
 }
 
 fn run_sub2(args: []const []const u8) anyerror!void {
-    var ip = ip_option.value.string.?;
-    std.log.debug("running sub2: ip={s}, bool={any}, float={any} arg_count={any}", .{ ip, bool_option.value.bool, float_option.value.float, args.len });
+    const c = &config;
+    std.log.debug("running sub2: ip={s}, bool={any}, float={any} arg_count={any}", .{ c.ip, c.bool, c.float, args.len });
 }
