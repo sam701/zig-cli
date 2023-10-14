@@ -23,6 +23,7 @@ pub fn getValueData(comptime T: type) ValueData {
                 return stringData(T);
             }
         },
+        .Enum => enumData(ValueType, T),
         else => @compileError("unsupported value type"),
     };
 }
@@ -77,5 +78,25 @@ fn stringData(comptime DestinationType: type) ValueData {
             }
         }.parser,
         .type_name = "string",
+    };
+}
+
+fn enumData(comptime ValueType: type, comptime DestinationType: type) ValueData {
+    const edata = @typeInfo(ValueType).Enum;
+    return .{
+        .value_size = @sizeOf(DestinationType),
+        .value_parser = struct {
+            fn parser(dest: *anyopaque, value: []const u8) anyerror!void {
+                inline for (edata.fields) |field| {
+                    if (std.mem.eql(u8, field.name, value)) {
+                        const dt: *DestinationType = @ptrCast(@alignCast(dest));
+                        dt.* = @field(ValueType, field.name);
+                        return;
+                    }
+                }
+                return error.InvalidEnumValue;
+            }
+        }.parser,
+        .type_name = "enum",
     };
 }

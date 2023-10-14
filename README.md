@@ -11,6 +11,7 @@ Inspired by [urfave/cli](https://github.com/urfave/cli) Go package.
 * concatenated short options: `-a -b -c` equals `-abc`
 * subcommands: `command1 -option1 subcommand2 -option2`
 * multiple option values: `--opt val1 --opt val2 --opt val3`
+* enums as option values: `--opt EnumValue1`
 * options value can be read from environment variables with a configured prefix
 * positional arguments can be mixed with options: `--opt1 val1 arg1 -v`
 * stops option parsing after `--`: `command -- --abc` will consider `--abc` as a positional argument to `command`.

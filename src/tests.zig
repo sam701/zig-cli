@@ -240,3 +240,29 @@ test "mix positional arguments and options" {
     try std.testing.expectEqualStrings("--arg3", result.args[2]);
     try std.testing.expectEqualStrings("-arg4", result.args[3]);
 }
+
+test "parse enums" {
+    const Aa = enum {
+        cc,
+        dd,
+    };
+    var aa: []Aa = undefined;
+    var aa_opt = command.Option{
+        .long_name = "aa",
+        .short_alias = 'a',
+        .help = "option aa",
+        .value_ref = mkRef(&aa),
+    };
+    var app = command.App{
+        .name = "abc",
+        .options = &.{&aa_opt},
+        .action = dummy_action,
+    };
+
+    _ = try run(&app, &.{ "abc", "--aa=cc", "--aa", "dd" });
+    try std.testing.expect(2 == aa.len);
+    try std.testing.expect(aa[0] == Aa.cc);
+    try std.testing.expect(aa[1] == Aa.dd);
+
+    alloc.free(aa);
+}
