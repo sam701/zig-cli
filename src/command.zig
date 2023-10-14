@@ -11,6 +11,10 @@ pub const App = struct {
     subcommands: ?[]const *const Command = null,
     action: ?Action = null,
 
+    /// If set all options can be set by providing an environment variable.
+    /// For example an option with a long name `hello_world` can be set by setting `<prefix in upper case>_HELLO_WORLD` environment variable.
+    option_envvar_prefix: ?[]const u8 = null,
+
     help_config: HelpConfig = HelpConfig{},
 };
 
@@ -48,4 +52,5 @@ pub const Option = struct {
     required: bool = false,
     value_ref: ValueRef,
     value_name: []const u8 = "VALUE",
+    envvar: ?[]const u8 = null,
 };

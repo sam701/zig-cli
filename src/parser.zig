@@ -90,22 +90,55 @@ pub fn Parser(comptime Iterator: type) type {
         }
 
         fn finalize(self: *Self) !ParseResult {
-            self.ensure_all_required_set(self.current_command());
-            var args = try self.captured_arguments.toOwnedSlice();
-
             for (self.command_path.items) |cmd| {
                 if (cmd.options) |options| {
                     for (options) |opt| {
+                        try self.set_option_value_from_envvar(opt);
                         try opt.value_ref.finalize(self.alloc);
                     }
                 }
             }
+
+            self.ensure_all_required_set(self.current_command());
+            var args = try self.captured_arguments.toOwnedSlice();
 
             if (self.current_command().action) |action| {
                 return ParseResult{ .action = action, .args = args };
             } else {
                 self.fail("command '{s}': no subcommand provided", .{self.current_command().name});
                 unreachable;
+            }
+        }
+
+        fn set_option_value_from_envvar(self: *const Self, opt: *command.Option) !void {
+            if (opt.value_ref.element_count > 0) return;
+
+            if (opt.envvar) |envvar_name| {
+                if (std.os.getenv(envvar_name)) |value| {
+                    opt.value_ref.put(value, self.alloc) catch |err| {
+                        self.fail("envvar({s}): cannot parse {s} value '{s}': {s}", .{ envvar_name, opt.value_ref.value_data.type_name, value, @errorName(err) });
+                        unreachable;
+                    };
+                }
+            } else if (self.app.option_envvar_prefix) |prefix| {
+                var envvar_name = try self.alloc.alloc(u8, opt.long_name.len + prefix.len + 1);
+                defer self.alloc.free(envvar_name);
+                @memcpy(envvar_name[0..prefix.len], prefix);
+                envvar_name[prefix.len] = '_';
+                for (envvar_name[prefix.len + 1 ..], opt.long_name) |*dest, name_char| {
+                    if (name_char == '-') {
+                        dest.* = '_';
+                    } else {
+                        dest.* = std.ascii.toUpper(name_char);
+                    }
+                }
+
+                if (std.os.getenv(envvar_name)) |value| {
+                    opt.value_ref.put(value, self.alloc) catch |err| {
+                        self.fail("envvar({s}): cannot parse {s} value '{s}': {s}", .{ envvar_name, opt.value_ref.value_data.type_name, value, @errorName(err) });
+                        unreachable;
+                    };
+                }
             }
         }
 
