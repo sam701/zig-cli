@@ -29,6 +29,6 @@ pub fn main() !void {
     return cli.run(app, allocator);
 }
 
-fn run_server(_: []const []const u8) !void {
+fn run_server() !void {
     std.log.debug("server is listening on {s}:{}", .{ config.host, config.port });
 }

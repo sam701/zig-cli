@@ -25,18 +25,17 @@ const StringSliceIterator = struct {
     }
 };
 
-fn run(app: *command.App, items: []const []const u8) !ParseResult {
+fn run(app: *command.App, items: []const []const u8) !void {
     var it = StringSliceIterator{
         .items = items,
     };
 
     var parser = try Parser(StringSliceIterator).init(app, it, alloc);
-    var result = try parser.parse();
+    _ = try parser.parse();
     parser.deinit();
-    return result;
 }
 
-fn dummy_action(_: []const []const u8) !void {}
+fn dummy_action() !void {}
 
 test "long option" {
     var aa: []const u8 = "test";
@@ -211,6 +210,8 @@ test "string list" {
 }
 
 test "mix positional arguments and options" {
+    var arg1: u32 = 0;
+    var args: []const []const u8 = undefined;
     var aav: []const u8 = undefined;
     var bbv: []const u8 = undefined;
     var aa = command.Option{
@@ -224,21 +225,28 @@ test "mix positional arguments and options" {
         .help = "option bb",
         .value_ref = mkRef(&bbv),
     };
-    var app = command.App{
-        .name = "abc",
-        .options = &.{ &aa, &bb },
-        .action = dummy_action,
+    var parg1 = command.PositionalArg{
+        .name = "abc1",
+        .help = "help",
+        .value_ref = mkRef(&arg1),
     };
+    var parg2 = command.PositionalArg{
+        .name = "abc",
+        .help = "help",
+        .value_ref = mkRef(&args),
+    };
+    var app = command.App{ .name = "abc", .options = &.{ &aa, &bb }, .action = dummy_action, .positional_args = &.{ &parg1, &parg2 } };
 
-    var result = try run(&app, &.{ "cmd", "--bb", "tt", "arg1", "-a", "val", "arg2", "--", "--arg3", "-arg4" });
-    defer std.testing.allocator.free(result.args);
+    try run(&app, &.{ "cmd", "--bb", "tt", "178", "-a", "val", "arg2", "--", "--arg3", "-arg4" });
+    defer std.testing.allocator.free(args);
+
     try std.testing.expectEqualStrings("val", aav);
     try std.testing.expectEqualStrings("tt", bbv);
-    try expect(result.args.len == 4);
-    try std.testing.expectEqualStrings("arg1", result.args[0]);
-    try std.testing.expectEqualStrings("arg2", result.args[1]);
-    try std.testing.expectEqualStrings("--arg3", result.args[2]);
-    try std.testing.expectEqualStrings("-arg4", result.args[3]);
+    try std.testing.expect(arg1 == 178);
+    try expect(args.len == 3);
+    try std.testing.expectEqualStrings("arg2", args[0]);
+    try std.testing.expectEqualStrings("--arg3", args[1]);
+    try std.testing.expectEqualStrings("-arg4", args[2]);
 }
 
 test "parse enums" {

@@ -1,12 +1,12 @@
 const std = @import("std");
-const vref = @import("./value_ref.zig");
-pub const ValueRef = vref.ValueRef;
+const ValueRef = @import("./value_ref.zig").ValueRef;
 
 pub const App = struct {
     name: []const u8,
     description: ?[]const u8 = null,
     version: ?[]const u8 = null,
     author: ?[]const u8 = null,
+    positional_args: ?[]const *PositionalArg = null,
     options: ?[]const *Option = null,
     subcommands: ?[]const *const Command = null,
     action: ?Action = null,
@@ -43,7 +43,7 @@ pub const Command = struct {
     action: ?Action = null,
 };
 
-pub const Action = *const fn (args: []const []const u8) anyerror!void;
+pub const Action = *const fn () anyerror!void;
 
 pub const Option = struct {
     long_name: []const u8,
@@ -53,4 +53,10 @@ pub const Option = struct {
     value_ref: ValueRef,
     value_name: []const u8 = "VALUE",
     envvar: ?[]const u8 = null,
+};
+
+pub const PositionalArg = struct {
+    name: []const u8,
+    help: []const u8,
+    value_ref: ValueRef,
 };

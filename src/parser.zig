@@ -5,12 +5,10 @@ const command = @import("command.zig");
 const help = @import("./help.zig");
 const argp = @import("./arg.zig");
 const Printer = @import("./Printer.zig");
-const mkRef = @import("./value_ref.zig").mkRef;
+const vref = @import("./value_ref.zig");
+const mkRef = vref.mkRef;
 
-pub const ParseResult = struct {
-    action: command.Action,
-    args: []const []const u8,
-};
+pub const ParseResult = command.Action;
 
 pub fn run(app: *const command.App, alloc: Allocator) anyerror!void {
     var iter = try std.process.argsWithAllocator(alloc);
@@ -19,8 +17,8 @@ pub fn run(app: *const command.App, alloc: Allocator) anyerror!void {
     var cr = try Parser(std.process.ArgIterator).init(app, iter, alloc);
     defer cr.deinit();
 
-    var result = try cr.parse();
-    return result.action(result.args);
+    var action = try cr.parse();
+    return action();
 }
 
 var help_option_set: bool = false;
@@ -40,7 +38,7 @@ pub fn Parser(comptime Iterator: type) type {
         arg_iterator: Iterator,
         app: *const command.App,
         command_path: std.ArrayList(*const command.Command),
-        captured_arguments: std.ArrayList([]const u8),
+        position_argument_ix: usize = 0,
 
         pub fn init(app: *const command.App, it: Iterator, alloc: Allocator) !Self {
             return Self{
@@ -48,12 +46,10 @@ pub fn Parser(comptime Iterator: type) type {
                 .arg_iterator = it,
                 .app = app,
                 .command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16),
-                .captured_arguments = try std.ArrayList([]const u8).initCapacity(alloc, 16),
             };
         }
 
         pub fn deinit(self: *Self) void {
-            self.captured_arguments.deinit();
             self.command_path.deinit();
         }
 
@@ -77,9 +73,9 @@ pub fn Parser(comptime Iterator: type) type {
             var args_only = false;
             while (self.next_arg()) |arg| {
                 if (args_only) {
-                    try self.captured_arguments.append(arg);
-                } else if (argp.interpret(arg)) |int| {
-                    args_only = try self.process_interpretation(&int);
+                    try self.handlePositionalArgument(arg);
+                } else if (argp.interpret(arg)) |interpretation| {
+                    args_only = try self.process_interpretation(&interpretation);
                 } else |err| {
                     switch (err) {
                         error.MissingOptionArgument => self.fail("missing argument: '{s}'", .{arg}),
@@ -95,18 +91,38 @@ pub fn Parser(comptime Iterator: type) type {
                     for (options) |opt| {
                         try self.set_option_value_from_envvar(opt);
                         try opt.value_ref.finalize(self.alloc);
+
+                        if (opt.required and opt.value_ref.element_count == 0) {
+                            self.fail("missing required option '{s}'", .{opt.long_name});
+                        }
                     }
                 }
             }
-
-            self.ensure_all_required_set(self.current_command());
-            var args = try self.captured_arguments.toOwnedSlice();
+            if (self.app.positional_args) |pargs| {
+                for (pargs) |parg| {
+                    try parg.value_ref.finalize(self.alloc);
+                }
+            }
 
             if (self.current_command().action) |action| {
-                return ParseResult{ .action = action, .args = args };
+                return action;
             } else {
                 self.fail("command '{s}': no subcommand provided", .{self.current_command().name});
                 unreachable;
+            }
+        }
+
+        fn handlePositionalArgument(self: *Self, arg: []const u8) !void {
+            if (self.app.positional_args) |posArgs| {
+                if (self.position_argument_ix >= posArgs.len) {
+                    self.fail("unexpected positional argument: {s}", .{arg});
+                }
+
+                const posArgRef = &posArgs[self.position_argument_ix].value_ref;
+                try posArgRef.put(arg, self.alloc);
+                if (posArgRef.value_type == vref.ValueType.single) {
+                    self.position_argument_ix += 1;
+                }
             }
         }
 
@@ -151,11 +167,10 @@ pub fn Parser(comptime Iterator: type) type {
                 },
                 .other => |some_name| {
                     if (find_subcommand(self.current_command(), some_name)) |cmd| {
-                        self.ensure_all_required_set(self.current_command());
-                        self.validate_command(cmd);
+                        self.validate_command(cmd); // TODO: validation can happen at comptime for all commands
                         try self.command_path.append(cmd);
                     } else {
-                        try self.captured_arguments.append(some_name);
+                        try self.handlePositionalArgument(some_name);
                     }
                 },
             };
@@ -257,16 +272,6 @@ pub fn Parser(comptime Iterator: type) type {
                     opt.value_ref.put("true", self.alloc) catch unreachable;
                 } else {
                     self.fail("'-{c}' is not a boolean option", .{alias});
-                }
-            }
-        }
-
-        fn ensure_all_required_set(self: *const Self, cmd: *const command.Command) void {
-            if (cmd.options) |list| {
-                for (list) |option| {
-                    if (option.required and option.value_ref.element_count == 0) {
-                        self.fail("missing required option '{s}'", .{option.long_name});
-                    }
                 }
             }
         }

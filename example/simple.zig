@@ -69,7 +69,7 @@ pub fn main() anyerror!void {
     return cli.run(app, allocator);
 }
 
-fn run_sub2(args: []const []const u8) anyerror!void {
+fn run_sub2() anyerror!void {
     const c = &config;
-    std.log.debug("running sub2: ip={s}, bool={any}, float={any} arg_count={any}", .{ c.ip, c.bool, c.float, args.len });
+    std.log.debug("running sub2: ip={s}, bool={any}, float={any}", .{ c.ip, c.bool, c.float });
 }
