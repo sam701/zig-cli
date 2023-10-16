@@ -65,6 +65,7 @@ pub fn Parser(comptime Iterator: type) type {
                 .action = self.app.action,
                 .subcommands = self.app.subcommands,
                 .options = self.app.options,
+                .positional_args = self.app.positional_args,
             };
             try self.command_path.append(&app_command);
 
@@ -97,10 +98,14 @@ pub fn Parser(comptime Iterator: type) type {
                         }
                     }
                 }
-            }
-            if (self.app.positional_args) |pargs| {
-                for (pargs) |parg| {
-                    try parg.value_ref.finalize(self.alloc);
+                if (cmd.positional_args) |pargs| {
+                    for (pargs) |parg| {
+                        try parg.value_ref.finalize(self.alloc);
+
+                        if (parg.required and parg.value_ref.element_count == 0) {
+                            self.fail("missing required positional argument '{s}'", .{parg.name});
+                        }
+                    }
                 }
             }
 
@@ -113,13 +118,17 @@ pub fn Parser(comptime Iterator: type) type {
         }
 
         fn handlePositionalArgument(self: *Self, arg: []const u8) !void {
-            if (self.app.positional_args) |posArgs| {
+            if (self.current_command().positional_args) |posArgs| {
                 if (self.position_argument_ix >= posArgs.len) {
-                    self.fail("unexpected positional argument: {s}", .{arg});
+                    self.fail("unexpected positional argument '{s}'", .{arg});
                 }
 
-                const posArgRef = &posArgs[self.position_argument_ix].value_ref;
-                try posArgRef.put(arg, self.alloc);
+                var posArg = posArgs[self.position_argument_ix];
+                var posArgRef = &posArg.value_ref;
+                posArgRef.put(arg, self.alloc) catch |err| {
+                    self.fail("positional argument ({s}): cannot parse '{s}' as {s}: {s}", .{ posArg.name, arg, posArgRef.value_data.type_name, @errorName(err) });
+                    unreachable;
+                };
                 if (posArgRef.value_type == vref.ValueType.single) {
                     self.position_argument_ix += 1;
                 }
@@ -166,7 +175,13 @@ pub fn Parser(comptime Iterator: type) type {
                     args_only = true;
                 },
                 .other => |some_name| {
-                    if (find_subcommand(self.current_command(), some_name)) |cmd| {
+                    const has_positional_arguments = if (self.current_command().positional_args) |pargs|
+                        self.position_argument_ix > 0 or pargs[0].value_ref.element_count > 0
+                    else
+                        false;
+                    if (has_positional_arguments) {
+                        try self.handlePositionalArgument(some_name);
+                    } else if (find_subcommand(self.current_command(), some_name)) |cmd| {
                         self.validate_command(cmd); // TODO: validation can happen at comptime for all commands
                         try self.command_path.append(cmd);
                     } else {

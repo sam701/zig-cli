@@ -243,7 +243,7 @@ test "mix positional arguments and options" {
     try std.testing.expectEqualStrings("val", aav);
     try std.testing.expectEqualStrings("tt", bbv);
     try std.testing.expect(arg1 == 178);
-    try expect(args.len == 3);
+    try std.testing.expectEqual(@as(usize, 3), args.len);
     try std.testing.expectEqualStrings("arg2", args[0]);
     try std.testing.expectEqualStrings("--arg3", args[1]);
     try std.testing.expectEqualStrings("-arg4", args[2]);

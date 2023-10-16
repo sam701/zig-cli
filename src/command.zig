@@ -39,6 +39,7 @@ pub const Command = struct {
     /// One liner for subcommands
     help: []const u8,
     options: ?[]const *Option = null,
+    positional_args: ?[]const *PositionalArg = null,
     subcommands: ?[]const *const Command = null,
     action: ?Action = null,
 };
@@ -59,4 +60,5 @@ pub const PositionalArg = struct {
     name: []const u8,
     help: []const u8,
     value_ref: ValueRef,
+    required: bool = false,
 };

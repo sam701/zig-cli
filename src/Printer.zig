@@ -23,6 +23,10 @@ pub inline fn write(self: *Self, text: []const u8) void {
     _ = self.out.write(text) catch unreachable;
 }
 
+pub inline fn printNewLine(self: *Self) void {
+    self.write("\n");
+}
+
 pub inline fn format(self: *Self, comptime text: []const u8, args: anytype) void {
     std.fmt.format(self.out, text, args) catch unreachable;
 }
