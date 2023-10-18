@@ -1,6 +1,7 @@
 const std = @import("std");
 const command = @import("command.zig");
 const Printer = @import("Printer.zig");
+const value_ref = @import("value_ref.zig");
 
 const color_clear = "0";
 
@@ -44,7 +45,16 @@ const HelpPrinter = struct {
             self.printer.format("{s} ", .{cmd.name});
         }
         var current_command = command_path[command_path.len - 1];
-        self.printer.format("[OPTIONS]\n", .{});
+        self.printer.format("[OPTIONS]", .{});
+        if (current_command.positional_args) |pargs| {
+            for (pargs) |parg| {
+                self.printer.format(" <{s}>", .{parg.name});
+                if (parg.value_ref.value_type == value_ref.ValueType.multi) {
+                    self.printer.write("...");
+                }
+            }
+        }
+        self.printer.printNewLine();
         self.printer.printColor(color_clear);
 
         if (command_path.len > 1) {
@@ -52,6 +62,21 @@ const HelpPrinter = struct {
         }
         if (current_command.description) |desc| {
             self.printer.format("\n{s}\n", .{desc});
+        }
+
+        if (current_command.positional_args) |pargs| {
+            self.printer.printInColor(self.help_config.color_section, "\nARGUMENTS:\n");
+            var max_arg_width: usize = 0;
+            for (pargs) |parg| {
+                max_arg_width = @max(max_arg_width, parg.name.len);
+            }
+            for (pargs) |parg| {
+                self.printer.write("  ");
+                self.printer.printInColor(self.help_config.color_option, parg.name);
+                self.printer.printSpaces(max_arg_width - parg.name.len + 3);
+                self.printer.write(parg.help);
+                self.printer.printNewLine();
+            }
         }
 
         if (current_command.subcommands) |sc_list| {
