@@ -1,0 +1,4 @@
+.{
+	.name = "zig-cli",
+	.version = "0.8.0",
+}

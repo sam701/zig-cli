@@ -16,4 +16,5 @@ jobs:
         with:
           version: master
       - run: zig fmt --check *.zig src/*.zig
+      - run: zig build
       - run: zig build test
