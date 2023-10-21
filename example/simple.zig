@@ -49,39 +49,65 @@ var arg2 = cli.PositionalArg{
     .help = "multiple arg2 help",
     .value_ref = cli.mkRef(&config.arg2),
 };
-var app = &cli.App{
-    .name = "simple",
-    .description = "This a simple CLI app\nEnjoy!",
-    .version = "0.10.3",
-    .author = "sam701 & contributors",
-    .subcommands = &.{&cli.Command{
-        .name = "sub1",
-        .help = "another awesome command",
-        .description =
+
+var sub1 = cli.Command{
+    .name = "sub1",
+    .description = cli.Description{
+        .one_line = "another awesome command",
+        .detailed =
         \\this is my awesome multiline description.
         \\This is already line 2.
         \\And this is line 3.
         ,
-        .options = &.{
-            &ip_option,
-            &int_option,
-            &bool_option,
-            &float_option,
+    },
+    .options = &.{
+        &ip_option,
+        &int_option,
+        &bool_option,
+        &float_option,
+    },
+    .target = cli.CommandTarget{
+        .subcommands = &.{ &sub2, &sub3 },
+    },
+};
+
+var sub2 = cli.Command{
+    .name = "sub2",
+    .description = cli.Description{
+        .one_line = "sub2 help",
+    },
+    .target = cli.CommandTarget{
+        .action = cli.CommandAction{
+            .exec = run_sub2,
         },
-        .subcommands = &.{ &cli.Command{
-            .name = "sub2",
-            .help = "sub2 help",
-            .action = run_sub2,
-        }, &cli.Command{
-            .name = "sub3",
-            .help = "sub3 command with that takes positional arguments",
-            .action = run_sub3,
-            .positional_args = &.{
-                &arg1,
-                &arg2,
-            },
-        } },
-    }},
+    },
+};
+
+var sub3 = cli.Command{
+    .name = "sub3",
+    .description = cli.Description{
+        .one_line = "sub3 with positional arguments",
+    },
+    .target = cli.CommandTarget{
+        .action = cli.CommandAction{
+            .positional_args = &.{ &arg1, &arg2 },
+            .exec = run_sub3,
+        },
+    },
+};
+
+var app = &cli.App{
+    .command = cli.Command{
+        .name = "simple",
+        .description = cli.Description{
+            .one_line = "This a simple CLI app. Enjoy!",
+        },
+        .target = cli.CommandTarget{
+            .subcommands = &.{&sub1},
+        },
+    },
+    .version = "0.10.3",
+    .author = "sam701 & contributors",
 };
 
 pub fn main() anyerror!void {

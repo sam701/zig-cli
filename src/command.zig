@@ -2,14 +2,9 @@ const std = @import("std");
 const ValueRef = @import("./value_ref.zig").ValueRef;
 
 pub const App = struct {
-    name: []const u8,
-    description: ?[]const u8 = null,
+    command: Command,
     version: ?[]const u8 = null,
     author: ?[]const u8 = null,
-    positional_args: ?[]const *PositionalArg = null,
-    options: ?[]const *Option = null,
-    subcommands: ?[]const *const Command = null,
-    action: ?Action = null,
 
     /// If set all options can be set by providing an environment variable.
     /// For example an option with a long name `hello_world` can be set by setting `<prefix in upper case>_HELLO_WORLD` environment variable.
@@ -34,17 +29,27 @@ pub const HelpConfig = struct {
 
 pub const Command = struct {
     name: []const u8,
-    /// Detailed multiline command description
-    description: ?[]const u8 = null,
-    /// One liner for subcommands
-    help: []const u8,
+    description: Description,
     options: ?[]const *Option = null,
-    positional_args: ?[]const *PositionalArg = null,
-    subcommands: ?[]const *const Command = null,
-    action: ?Action = null,
+    target: CommandTarget,
 };
 
-pub const Action = *const fn () anyerror!void;
+pub const Description = struct {
+    one_line: []const u8,
+    detailed: ?[]const u8 = null,
+};
+
+pub const CommandTarget = union(enum) {
+    subcommands: []const *const Command,
+    action: CommandAction,
+};
+
+pub const CommandAction = struct {
+    positional_args: ?[]const *PositionalArg = null,
+    exec: ExecFn,
+};
+
+pub const ExecFn = *const fn () anyerror!void;
 
 pub const Option = struct {
     long_name: []const u8,

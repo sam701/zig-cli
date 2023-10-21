@@ -8,7 +8,7 @@ const Printer = @import("./Printer.zig");
 const vref = @import("./value_ref.zig");
 const mkRef = vref.mkRef;
 
-pub const ParseResult = command.Action;
+pub const ParseResult = command.ExecFn;
 
 pub fn run(app: *const command.App, alloc: Allocator) anyerror!void {
     var iter = try std.process.argsWithAllocator(alloc);
@@ -58,18 +58,8 @@ pub fn Parser(comptime Iterator: type) type {
         }
 
         pub fn parse(self: *Self) anyerror!ParseResult {
-            const app_command = command.Command{
-                .name = self.app.name,
-                .description = self.app.description,
-                .help = "",
-                .action = self.app.action,
-                .subcommands = self.app.subcommands,
-                .options = self.app.options,
-                .positional_args = self.app.positional_args,
-            };
-            try self.command_path.append(&app_command);
+            try self.command_path.append(&self.app.command);
 
-            self.validate_command(&app_command);
             _ = self.next_arg();
             var args_only = false;
             while (self.next_arg()) |arg| {
@@ -98,40 +88,56 @@ pub fn Parser(comptime Iterator: type) type {
                         }
                     }
                 }
-                if (cmd.positional_args) |pargs| {
-                    for (pargs) |parg| {
-                        try parg.value_ref.finalize(self.alloc);
+                switch (cmd.target) {
+                    .action => |act| {
+                        if (act.positional_args) |pargs| {
+                            for (pargs) |parg| {
+                                try parg.value_ref.finalize(self.alloc);
 
-                        if (parg.required and parg.value_ref.element_count == 0) {
-                            self.fail("missing required positional argument '{s}'", .{parg.name});
+                                if (parg.required and parg.value_ref.element_count == 0) {
+                                    self.fail("missing required positional argument '{s}'", .{parg.name});
+                                }
+                            }
                         }
-                    }
+                    },
+                    .subcommands => {},
                 }
             }
 
-            if (self.current_command().action) |action| {
-                return action;
-            } else {
-                self.fail("command '{s}': no subcommand provided", .{self.current_command().name});
-                unreachable;
+            switch (self.current_command().target) {
+                .action => |act| {
+                    return act.exec;
+                },
+                .subcommands => {
+                    self.fail("command '{s}': no subcommand provided", .{self.current_command().name});
+                    unreachable;
+                },
             }
         }
 
         fn handlePositionalArgument(self: *Self, arg: []const u8) !void {
-            if (self.current_command().positional_args) |posArgs| {
-                if (self.position_argument_ix >= posArgs.len) {
-                    self.fail("unexpected positional argument '{s}'", .{arg});
-                }
+            const cmd = self.current_command();
+            switch (cmd.target) {
+                .subcommands => {
+                    self.fail("command '{s}' cannot have positional arguments", .{cmd.name});
+                },
+                .action => |act| {
+                    if (act.positional_args) |posArgs| {
+                        if (self.position_argument_ix >= posArgs.len) {
+                            self.fail("unexpected positional argument '{s}'", .{arg});
+                        }
 
-                var posArg = posArgs[self.position_argument_ix];
-                var posArgRef = &posArg.value_ref;
-                posArgRef.put(arg, self.alloc) catch |err| {
-                    self.fail("positional argument ({s}): cannot parse '{s}' as {s}: {s}", .{ posArg.name, arg, posArgRef.value_data.type_name, @errorName(err) });
-                    unreachable;
-                };
-                if (posArgRef.value_type == vref.ValueType.single) {
-                    self.position_argument_ix += 1;
-                }
+                        var posArg = posArgs[self.position_argument_ix];
+                        var posArgRef = &posArg.value_ref;
+                        posArgRef.put(arg, self.alloc) catch |err| {
+                            self.fail("positional argument ({s}): cannot parse '{s}' as {s}: {s}", .{ posArg.name, arg, posArgRef.value_data.type_name, @errorName(err) });
+                            unreachable;
+                        };
+                        if (posArgRef.value_type == vref.ValueType.single) {
+                            self.position_argument_ix += 1;
+                        }
+                    }
+                },
             }
         }
 
@@ -175,17 +181,20 @@ pub fn Parser(comptime Iterator: type) type {
                     args_only = true;
                 },
                 .other => |some_name| {
-                    const has_positional_arguments = if (self.current_command().positional_args) |pargs|
-                        self.position_argument_ix > 0 or pargs[0].value_ref.element_count > 0
-                    else
-                        false;
-                    if (has_positional_arguments) {
-                        try self.handlePositionalArgument(some_name);
-                    } else if (find_subcommand(self.current_command(), some_name)) |cmd| {
-                        self.validate_command(cmd); // TODO: validation can happen at comptime for all commands
-                        try self.command_path.append(cmd);
-                    } else {
-                        try self.handlePositionalArgument(some_name);
+                    const cmd = self.current_command();
+                    switch (cmd.target) {
+                        .subcommands => |cmds| {
+                            for (cmds) |sc| {
+                                if (std.mem.eql(u8, sc.name, some_name)) {
+                                    try self.command_path.append(sc);
+                                    return false;
+                                }
+                            }
+                            self.fail("no such subcommand '{s}'", .{some_name});
+                        },
+                        .action => {
+                            try self.handlePositionalArgument(some_name);
+                        },
                     }
                 },
             };
@@ -267,18 +276,6 @@ pub fn Parser(comptime Iterator: type) type {
             unreachable;
         }
 
-        fn validate_command(self: *const Self, cmd: *const command.Command) void {
-            if (cmd.subcommands == null) {
-                if (cmd.action == null) {
-                    self.fail("command '{s}' has neither subcommands no an aciton assigned", .{cmd.name});
-                }
-            } else {
-                if (cmd.action != null) {
-                    self.fail("command '{s}' has subcommands and an action assigned. Commands with subcommands are not allowed to have action.", .{cmd.name});
-                }
-            }
-        }
-
         /// Set boolean options provided like `-acde`
         fn set_concatenated_boolean_options(self: *const Self, cmd: *const command.Command, options: []const u8) void {
             for (options) |alias| {
@@ -291,15 +288,4 @@ pub fn Parser(comptime Iterator: type) type {
             }
         }
     };
-}
-
-fn find_subcommand(cmd: *const command.Command, subcommand_name: []const u8) ?*const command.Command {
-    if (cmd.subcommands) |sc_list| {
-        for (sc_list) |sc| {
-            if (std.mem.eql(u8, sc.name, subcommand_name)) {
-                return sc;
-            }
-        }
-    }
-    return null;
 }
