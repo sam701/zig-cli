@@ -11,7 +11,7 @@ jobs:
   validate_and_test_master:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: goto-bus-stop/setup-zig@v2
         with:
           version: master
@@ -21,7 +21,7 @@ jobs:
   validate_and_test_011:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.11.0
