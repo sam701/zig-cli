@@ -25,7 +25,7 @@ const StringSliceIterator = struct {
     }
 };
 
-fn run(app: *command.App, items: []const []const u8) !void {
+fn run(app: *const command.App, items: []const []const u8) !void {
     var it = StringSliceIterator{
         .items = items,
     };
@@ -37,6 +37,27 @@ fn run(app: *command.App, items: []const []const u8) !void {
 
 fn dummy_action() !void {}
 
+fn runOptionsPArgs(input: []const []const u8, options: []const *command.Option, pargs: ?[]const *command.PositionalArg) !void {
+    const app = command.App{
+        .command = command.Command{
+            .name = "cmd",
+            .description = command.Description{ .one_line = "short help" },
+            .options = options,
+            .target = command.CommandTarget{
+                .action = command.CommandAction{
+                    .positional_args = pargs,
+                    .exec = dummy_action,
+                },
+            },
+        },
+    };
+    try run(&app, input);
+}
+
+fn runOptions(input: []const []const u8, options: []const *command.Option) !void {
+    try runOptionsPArgs(input, options, null);
+}
+
 test "long option" {
     var aa: []const u8 = "test";
     var opt = command.Option{
@@ -44,16 +65,11 @@ test "long option" {
         .help = "option aa",
         .value_ref = mkRef(&aa),
     };
-    var cmd = command.App{
-        .name = "abc",
-        .options = &.{&opt},
-        .action = dummy_action,
-    };
 
-    _ = try run(&cmd, &.{ "cmd", "--aa", "val" });
+    try runOptions(&.{ "cmd", "--aa", "val" }, &.{&opt});
     try std.testing.expectEqualStrings("val", aa);
 
-    _ = try run(&cmd, &.{ "cmd", "--aa=bb" });
+    try runOptions(&.{ "cmd", "--aa=bb" }, &.{&opt});
     try std.testing.expectEqualStrings("bb", aa);
 }
 
@@ -65,16 +81,11 @@ test "short option" {
         .help = "option aa",
         .value_ref = mkRef(&aa),
     };
-    var app = command.App{
-        .name = "abc",
-        .options = &.{&opt},
-        .action = dummy_action,
-    };
 
-    _ = try run(&app, &.{ "abc", "-a", "val" });
+    try runOptions(&.{ "abc", "-a", "val" }, &.{&opt});
     try std.testing.expectEqualStrings("val", aa);
 
-    _ = try run(&app, &.{ "abc", "-a=bb" });
+    try runOptions(&.{ "abc", "-a=bb" }, &.{&opt});
     try std.testing.expectEqualStrings("bb", aa);
 }
 
@@ -93,13 +104,8 @@ test "concatenated aliases" {
         .help = "option aa",
         .value_ref = mkRef(&aa),
     };
-    var app = command.App{
-        .name = "abc",
-        .options = &.{ &bbopt, &opt },
-        .action = dummy_action,
-    };
 
-    _ = try run(&app, &.{ "abc", "-ba", "val" });
+    try runOptions(&.{ "abc", "-ba", "val" }, &.{ &opt, &bbopt });
     try std.testing.expectEqualStrings("val", aa);
     try expect(bb);
 }
@@ -117,13 +123,8 @@ test "int and float" {
         .help = "option bb",
         .value_ref = mkRef(&bb),
     };
-    var app = command.App{
-        .name = "abc",
-        .options = &.{ &aa_opt, &bb_opt },
-        .action = dummy_action,
-    };
 
-    _ = try run(&app, &.{ "abc", "--aa=34", "--bb", "15.25" });
+    try runOptions(&.{ "abc", "--aa=34", "--bb", "15.25" }, &.{ &aa_opt, &bb_opt });
     try expect(34 == aa);
     try expect(15.25 == bb);
 }
@@ -148,13 +149,8 @@ test "optional values" {
         .help = "option cc",
         .value_ref = mkRef(&cc),
     };
-    var app = command.App{
-        .name = "abc",
-        .options = &.{ &aa_opt, &bb_opt, &cc_opt },
-        .action = dummy_action,
-    };
 
-    _ = try run(&app, &.{ "abc", "--aa=34", "--bb", "15.25" });
+    try runOptions(&.{ "abc", "--aa=34", "--bb", "15.25" }, &.{ &aa_opt, &bb_opt, &cc_opt });
     try expect(34 == aa.?);
     try expect(15.25 == bb.?);
     try std.testing.expect(cc == null);
@@ -168,20 +164,14 @@ test "int list" {
         .help = "option aa",
         .value_ref = mkRef(&aa),
     };
-    var app = command.App{
-        .name = "abc",
-        .options = &.{&aa_opt},
-        .action = dummy_action,
-    };
 
-    _ = try run(&app, &.{ "abc", "--aa=100", "--aa", "200", "-a", "300", "-a=400" });
+    try runOptions(&.{ "abc", "--aa=100", "--aa", "200", "-a", "300", "-a=400" }, &.{&aa_opt});
     try expect(aa.len == 4);
     try expect(aa[0] == 100);
     try expect(aa[1] == 200);
     try expect(aa[2] == 300);
     try expect(aa[3] == 400);
 
-    // FIXME: it tries to deallocated u64 while the memory was allocated using u8 alignment
     alloc.free(aa);
 }
 
@@ -193,13 +183,8 @@ test "string list" {
         .help = "option aa",
         .value_ref = mkRef(&aa),
     };
-    var app = command.App{
-        .name = "abc",
-        .options = &.{&aa_opt},
-        .action = dummy_action,
-    };
 
-    _ = try run(&app, &.{ "abc", "--aa=a1", "--aa", "a2", "-a", "a3", "-a=a4" });
+    try runOptions(&.{ "abc", "--aa=a1", "--aa", "a2", "-a", "a3", "-a=a4" }, &.{&aa_opt});
     try expect(aa.len == 4);
     try std.testing.expectEqualStrings("a1", aa[0]);
     try std.testing.expectEqualStrings("a2", aa[1]);
@@ -235,9 +220,8 @@ test "mix positional arguments and options" {
         .help = "help",
         .value_ref = mkRef(&args),
     };
-    var app = command.App{ .name = "abc", .options = &.{ &aa, &bb }, .action = dummy_action, .positional_args = &.{ &parg1, &parg2 } };
 
-    try run(&app, &.{ "cmd", "--bb", "tt", "178", "-a", "val", "arg2", "--", "--arg3", "-arg4" });
+    try runOptionsPArgs(&.{ "cmd", "--bb", "tt", "178", "-a", "val", "arg2", "--", "--arg3", "-arg4" }, &.{ &aa, &bb }, &.{ &parg1, &parg2 });
     defer std.testing.allocator.free(args);
 
     try std.testing.expectEqualStrings("val", aav);
@@ -261,13 +245,8 @@ test "parse enums" {
         .help = "option aa",
         .value_ref = mkRef(&aa),
     };
-    var app = command.App{
-        .name = "abc",
-        .options = &.{&aa_opt},
-        .action = dummy_action,
-    };
 
-    _ = try run(&app, &.{ "abc", "--aa=cc", "--aa", "dd" });
+    try runOptions(&.{ "abc", "--aa=cc", "--aa", "dd" }, &.{&aa_opt});
     try std.testing.expect(2 == aa.len);
     try std.testing.expect(aa[0] == Aa.cc);
     try std.testing.expect(aa[1] == Aa.dd);
