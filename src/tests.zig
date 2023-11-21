@@ -26,12 +26,12 @@ const StringSliceIterator = struct {
 };
 
 fn run(app: *command.App, items: []const []const u8) !ParseResult {
-    var it = StringSliceIterator{
+    const it = StringSliceIterator{
         .items = items,
     };
 
     var parser = try Parser(StringSliceIterator).init(app, it, alloc);
-    var result = try parser.parse();
+    const result = try parser.parse();
     parser.deinit();
     return result;
 }
@@ -230,7 +230,7 @@ test "mix positional arguments and options" {
         .action = dummy_action,
     };
 
-    var result = try run(&app, &.{ "cmd", "--bb", "tt", "arg1", "-a", "val", "arg2", "--", "--arg3", "-arg4" });
+    const result = try run(&app, &.{ "cmd", "--bb", "tt", "arg1", "-a", "val", "arg2", "--", "--arg3", "-arg4" });
     defer std.testing.allocator.free(result.args);
     try std.testing.expectEqualStrings("val", aav);
     try std.testing.expectEqualStrings("tt", bbv);

@@ -43,7 +43,7 @@ const HelpPrinter = struct {
         for (command_path) |cmd| {
             self.printer.format("{s} ", .{cmd.name});
         }
-        var current_command = command_path[command_path.len - 1];
+        const current_command = command_path[command_path.len - 1];
         self.printer.format("[OPTIONS]\n", .{});
         self.printer.printColor(color_clear);
 
@@ -81,7 +81,7 @@ const HelpPrinter = struct {
         if (current_command.options) |option_list| {
             var max_option_width: usize = 0;
             for (option_list) |option| {
-                var w = option.long_name.len + option.value_name.len + 3;
+                const w = option.long_name.len + option.value_name.len + 3;
                 max_option_width = @max(max_option_width, w);
             }
             option_column_width = max_option_width + 3;
