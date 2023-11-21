@@ -21,7 +21,7 @@ pub const ValueRef = struct {
                 if (list.list_ptr == null) {
                     list.list_ptr = try list.vtable.createList(alloc);
                 }
-                var value_ptr = try list.vtable.addOne(list.list_ptr.?, alloc);
+                const value_ptr = try list.vtable.addOne(list.list_ptr.?, alloc);
                 try self.value_data.value_parser(value_ptr, value);
             },
         }
@@ -97,7 +97,7 @@ const ValueList = struct {
         const List = std.ArrayListUnmanaged(T);
         const gen = struct {
             fn createList(alloc: Allocator) anyerror!*anyopaque {
-                var list = try alloc.create(List);
+                const list = try alloc.create(List);
                 list.* = List{};
                 return list;
             }
@@ -107,7 +107,7 @@ const ValueList = struct {
             }
             fn finalize(list_ptr: *anyopaque, dest: *anyopaque, alloc: Allocator) anyerror!void {
                 const list: *List = @alignCast(@ptrCast(list_ptr));
-                var destSlice: *[]T = @alignCast(@ptrCast(dest));
+                const destSlice: *[]T = @alignCast(@ptrCast(dest));
                 destSlice.* = try list.toOwnedSlice(alloc);
                 alloc.destroy(list);
             }

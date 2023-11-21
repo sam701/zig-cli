@@ -100,7 +100,7 @@ pub fn Parser(comptime Iterator: type) type {
             }
 
             self.ensure_all_required_set(self.current_command());
-            var args = try self.captured_arguments.toOwnedSlice();
+            const args = try self.captured_arguments.toOwnedSlice();
 
             if (self.current_command().action) |action| {
                 return ParseResult{ .action = action, .args = args };
