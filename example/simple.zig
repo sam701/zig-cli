@@ -90,7 +90,10 @@ var sub3 = cli.Command{
     },
     .target = cli.CommandTarget{
         .action = cli.CommandAction{
-            .positional_args = &.{ &arg1, &arg2 },
+            .positional_args = cli.PositionalArgs{
+                .args = &.{ &arg1, &arg2 },
+                .first_optional_arg = &arg2,
+            },
             .exec = run_sub3,
         },
     },

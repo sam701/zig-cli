@@ -38,6 +38,7 @@ fn run(app: *const command.App, items: []const []const u8) !void {
 fn dummy_action() !void {}
 
 fn runOptionsPArgs(input: []const []const u8, options: []const *command.Option, pargs: ?[]const *command.PositionalArg) !void {
+    const pa = if (pargs) |p| command.PositionalArgs{ .args = p } else null;
     const app = command.App{
         .command = command.Command{
             .name = "cmd",
@@ -45,7 +46,7 @@ fn runOptionsPArgs(input: []const []const u8, options: []const *command.Option, 
             .options = options,
             .target = command.CommandTarget{
                 .action = command.CommandAction{
-                    .positional_args = pargs,
+                    .positional_args = pa,
                     .exec = dummy_action,
                 },
             },

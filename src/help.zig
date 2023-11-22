@@ -49,11 +49,22 @@ const HelpPrinter = struct {
         switch (cmd.target) {
             .action => |act| {
                 if (act.positional_args) |pargs| {
-                    for (pargs) |parg| {
-                        self.printer.format(" <{s}>", .{parg.name});
+                    var closeOpt = false;
+                    for (pargs.args) |parg| {
+                        self.printer.write(" ");
+                        if (pargs.first_optional_arg) |opt| {
+                            if (opt == parg) {
+                                self.printer.write("[");
+                                closeOpt = true;
+                            }
+                        }
+                        self.printer.format("<{s}>", .{parg.name});
                         if (parg.value_ref.value_type == value_ref.ValueType.multi) {
                             self.printer.write("...");
                         }
+                    }
+                    if (closeOpt) {
+                        self.printer.write("]");
                     }
                 }
             },
@@ -72,10 +83,10 @@ const HelpPrinter = struct {
                 if (act.positional_args) |pargs| {
                     self.printer.printInColor(self.help_config.color_section, "\nARGUMENTS:\n");
                     var max_arg_width: usize = 0;
-                    for (pargs) |parg| {
+                    for (pargs.args) |parg| {
                         max_arg_width = @max(max_arg_width, parg.name.len);
                     }
-                    for (pargs) |parg| {
+                    for (pargs.args) |parg| {
                         self.printer.write("  ");
                         self.printer.printInColor(self.help_config.color_option, parg.name);
                         self.printer.printSpaces(max_arg_width - parg.name.len + 3);

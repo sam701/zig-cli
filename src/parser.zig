@@ -91,10 +91,16 @@ pub fn Parser(comptime Iterator: type) type {
                 switch (cmd.target) {
                     .action => |act| {
                         if (act.positional_args) |pargs| {
-                            for (pargs) |parg| {
+                            var optional = false;
+                            for (pargs.args) |parg| {
                                 try parg.value_ref.finalize(self.alloc);
 
-                                if (parg.required and parg.value_ref.element_count == 0) {
+                                if (pargs.first_optional_arg) |first_opt| {
+                                    if (parg == first_opt) {
+                                        optional = true;
+                                    }
+                                }
+                                if (!optional and parg.value_ref.element_count == 0) {
                                     self.fail("missing required positional argument '{s}'", .{parg.name});
                                 }
                             }
@@ -123,11 +129,11 @@ pub fn Parser(comptime Iterator: type) type {
                 },
                 .action => |act| {
                     if (act.positional_args) |posArgs| {
-                        if (self.position_argument_ix >= posArgs.len) {
+                        if (self.position_argument_ix >= posArgs.args.len) {
                             self.fail("unexpected positional argument '{s}'", .{arg});
                         }
 
-                        var posArg = posArgs[self.position_argument_ix];
+                        var posArg = posArgs.args[self.position_argument_ix];
                         var posArgRef = &posArg.value_ref;
                         posArgRef.put(arg, self.alloc) catch |err| {
                             self.fail("positional argument ({s}): cannot parse '{s}' as {s}: {s}", .{ posArg.name, arg, posArgRef.value_data.type_name, @errorName(err) });

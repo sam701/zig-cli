@@ -45,7 +45,7 @@ pub const CommandTarget = union(enum) {
 };
 
 pub const CommandAction = struct {
-    positional_args: ?[]const *PositionalArg = null,
+    positional_args: ?PositionalArgs = null,
     exec: ExecFn,
 };
 
@@ -61,9 +61,15 @@ pub const Option = struct {
     envvar: ?[]const u8 = null,
 };
 
+pub const PositionalArgs = struct {
+    args: []const *PositionalArg,
+
+    /// If not set, all positional arguments are considered as required.
+    first_optional_arg: ?*const PositionalArg = null,
+};
+
 pub const PositionalArg = struct {
     name: []const u8,
     help: []const u8,
     value_ref: ValueRef,
-    required: bool = false,
 };
