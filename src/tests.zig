@@ -26,7 +26,7 @@ const StringSliceIterator = struct {
 };
 
 fn run(app: *const command.App, items: []const []const u8) !void {
-    var it = StringSliceIterator{
+    const it = StringSliceIterator{
         .items = items,
     };
 

@@ -44,7 +44,7 @@ const HelpPrinter = struct {
         for (command_path) |cmd| {
             self.printer.format("{s} ", .{cmd.name});
         }
-        var cmd = command_path[command_path.len - 1];
+        const cmd = command_path[command_path.len - 1];
         self.printer.format("[OPTIONS]", .{});
         switch (cmd.target) {
             .action => |act| {

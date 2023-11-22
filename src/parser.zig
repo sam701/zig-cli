@@ -17,7 +17,7 @@ pub fn run(app: *const command.App, alloc: Allocator) anyerror!void {
     var cr = try Parser(std.process.ArgIterator).init(app, iter, alloc);
     defer cr.deinit();
 
-    var action = try cr.parse();
+    const action = try cr.parse();
     return action();
 }
 
