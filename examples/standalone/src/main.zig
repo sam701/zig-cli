@@ -8,6 +8,7 @@ var config = struct {
     host: []const u8 = "localhost",
     port: u16 = undefined,
 }{};
+
 var host = cli.Option{
     .long_name = "host",
     .help = "host to listen on",
@@ -23,11 +24,8 @@ var app = &cli.App{
     .command = cli.Command{
         .name = "short",
         .options = &.{ &host, &port },
-        .description = cli.Description{ .one_line = "a short example" },
         .target = cli.CommandTarget{
-            .action = cli.CommandAction{
-                .exec = run_server,
-            },
+            .action = cli.CommandAction{ .exec = run_server },
         },
     },
 };

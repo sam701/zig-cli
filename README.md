@@ -47,7 +47,6 @@ var app = &cli.App{
     .command = cli.Command{
         .name = "short",
         .options = &.{ &host, &port },
-        .description = cli.Description{ .one_line = "a short example" },
         .target = cli.CommandTarget{
             .action = cli.CommandAction{ .exec = run_server },
         },

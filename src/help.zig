@@ -73,9 +73,11 @@ const HelpPrinter = struct {
         self.printer.printNewLine();
         self.printer.printColor(color_clear);
 
-        self.printer.format("\n{s}\n", .{cmd.description.one_line});
-        if (cmd.description.detailed) |det| {
-            self.printer.format("\n{s}\n", .{det});
+        if (cmd.description) |desc| {
+            self.printer.format("\n{s}\n", .{desc.one_line});
+            if (desc.detailed) |det| {
+                self.printer.format("\n{s}\n", .{det});
+            }
         }
 
         switch (cmd.target) {
@@ -107,13 +109,16 @@ const HelpPrinter = struct {
                     self.printer.printColor(self.help_config.color_option);
                     self.printer.format("  {s}", .{sc.name});
                     self.printer.printColor(color_clear);
-                    var i: usize = 0;
-                    while (i < cmd_column_width - sc.name.len) {
-                        self.printer.write(" ");
-                        i += 1;
-                    }
+                    if (sc.description) |desc| {
+                        var i: usize = 0;
+                        while (i < cmd_column_width - sc.name.len) {
+                            self.printer.write(" ");
+                            i += 1;
+                        }
 
-                    self.printer.format("{s}\n", .{sc.description.one_line});
+                        self.printer.format("{s}", .{desc.one_line});
+                    }
+                    self.printer.printNewLine();
                 }
             },
         }

@@ -73,9 +73,6 @@ var sub1 = cli.Command{
 
 var sub2 = cli.Command{
     .name = "sub2",
-    .description = cli.Description{
-        .one_line = "sub2 help",
-    },
     .target = cli.CommandTarget{
         .action = cli.CommandAction{
             .exec = run_sub2,

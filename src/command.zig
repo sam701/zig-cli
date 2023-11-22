@@ -29,7 +29,7 @@ pub const HelpConfig = struct {
 
 pub const Command = struct {
     name: []const u8,
-    description: Description,
+    description: ?Description = null,
     options: ?[]const *Option = null,
     target: CommandTarget,
 };
