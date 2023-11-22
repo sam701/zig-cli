@@ -213,7 +213,7 @@ pub fn Parser(comptime Iterator: type) type {
 
         fn process_option(self: *Self, option_interpretation: *const argp.OptionInterpretation) !void {
             var opt: *command.Option = switch (option_interpretation.option_type) {
-                .long => self.find_option_by_name(self.current_command(), option_interpretation.name),
+                .long => self.find_option_by_name(option_interpretation.name),
                 .short => a: {
                     self.set_concatenated_boolean_options(self.current_command(), option_interpretation.name[0 .. option_interpretation.name.len - 1]);
                     break :a self.find_option_by_alias(self.current_command(), option_interpretation.name[option_interpretation.name.len - 1]);
@@ -250,14 +250,18 @@ pub fn Parser(comptime Iterator: type) type {
             std.os.exit(1);
         }
 
-        fn find_option_by_name(self: *const Self, cmd: *const command.Command, option_name: []const u8) *command.Option {
+        fn find_option_by_name(self: *const Self, option_name: []const u8) *command.Option {
             if (std.mem.eql(u8, "help", option_name)) {
                 return &help_option;
             }
-            if (cmd.options) |option_list| {
-                for (option_list) |option| {
-                    if (std.mem.eql(u8, option.long_name, option_name)) {
-                        return option;
+            var ix = self.command_path.items.len - 1;
+            while (ix >= 0) : (ix -= 1) {
+                const cmd = self.command_path.items[ix];
+                if (cmd.options) |option_list| {
+                    for (option_list) |option| {
+                        if (std.mem.eql(u8, option.long_name, option_name)) {
+                            return option;
+                        }
                     }
                 }
             }
