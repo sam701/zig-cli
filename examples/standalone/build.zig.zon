@@ -1,0 +1,11 @@
+.{
+	.name = "standalone",
+	.version = "0.1.0",
+	.paths = .{"./src"},
+	.dependencies = .{
+		.@"zig-cli" = .{
+			.url = "https://github.com/sam701/zig-cli/archive/4914dd972c4b4579f3fded307c7e704fcb2001bf.tar.gz",
+			.hash = "1220ba256158526e02fca0bb823efd244b3a73256e9d9fc7ba155d774dd6788e3185",
+	    },
+	},
+}
