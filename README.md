@@ -62,6 +62,9 @@ fn run_server() !void {
 }
 ```
 
+### Using with the Zig package manager
+See the [`standalone`](./examples/standalone) example in the `examples` folder.
+
 ## Printing help
 See [`simple.zig`](./example/simple.zig)
 
