@@ -44,19 +44,26 @@ var port = cli.Option{
     .value_ref = cli.mkRef(&config.port),
 };
 var app = &cli.App{
-    .name = "short",
-    .options = &.{ &host, &port },
-    .action = run_server,
+    .command = cli.Command{
+        .name = "short",
+        .options = &.{ &host, &port },
+        .target = cli.CommandTarget{
+            .action = cli.CommandAction{ .exec = run_server },
+        },
+    },
 };
 
 pub fn main() !void {
     return cli.run(app, allocator);
 }
 
-fn run_server(_: []const []const u8) !void {
+fn run_server() !void {
     std.log.debug("server is listening on {s}:{}", .{ config.host, config.port });
 }
 ```
+
+### Using with the Zig package manager
+See the [`standalone`](./examples/standalone) example in the `examples` folder.
 
 ## Printing help
 See [`simple.zig`](./example/simple.zig)

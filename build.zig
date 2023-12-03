@@ -27,7 +27,7 @@ pub fn build(b: *std.Build) void {
 
     const simple = b.addExecutable(.{
         .name = "simple",
-        .root_source_file = .{ .path = "example/simple.zig" },
+        .root_source_file = .{ .path = "examples/simple.zig" },
         .optimize = optimize,
     });
     simple.addModule("zig-cli", module);
@@ -35,7 +35,7 @@ pub fn build(b: *std.Build) void {
 
     const short = b.addExecutable(.{
         .name = "short",
-        .root_source_file = .{ .path = "example/short.zig" },
+        .root_source_file = .{ .path = "examples/short.zig" },
         .optimize = optimize,
     });
     short.addModule("zig-cli", module);

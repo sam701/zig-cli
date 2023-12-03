@@ -1,6 +1,7 @@
 const std = @import("std");
 const command = @import("command.zig");
 const Printer = @import("Printer.zig");
+const value_ref = @import("value_ref.zig");
 
 const color_clear = "0";
 
@@ -23,7 +24,7 @@ const HelpPrinter = struct {
 
     fn printAppHelp(self: *HelpPrinter, app: *const command.App, command_path: []const *const command.Command) void {
         self.printer.printColor(self.help_config.color_app_name);
-        self.printer.format("{s}\n", .{app.name});
+        self.printer.format("{s}\n", .{app.command.name});
         self.printer.printColor(color_clear);
         if (app.version) |v| {
             self.printer.format("Version: {s}\n", .{v});
@@ -43,42 +44,88 @@ const HelpPrinter = struct {
         for (command_path) |cmd| {
             self.printer.format("{s} ", .{cmd.name});
         }
-        const current_command = command_path[command_path.len - 1];
-        self.printer.format("[OPTIONS]\n", .{});
+        const cmd = command_path[command_path.len - 1];
+        self.printer.format("[OPTIONS]", .{});
+        switch (cmd.target) {
+            .action => |act| {
+                if (act.positional_args) |pargs| {
+                    var closeOpt = false;
+                    for (pargs.args) |parg| {
+                        self.printer.write(" ");
+                        if (pargs.first_optional_arg) |opt| {
+                            if (opt == parg) {
+                                self.printer.write("[");
+                                closeOpt = true;
+                            }
+                        }
+                        self.printer.format("<{s}>", .{parg.name});
+                        if (parg.value_ref.value_type == value_ref.ValueType.multi) {
+                            self.printer.write("...");
+                        }
+                    }
+                    if (closeOpt) {
+                        self.printer.write("]");
+                    }
+                }
+            },
+            .subcommands => {},
+        }
+        self.printer.printNewLine();
         self.printer.printColor(color_clear);
 
-        if (command_path.len > 1) {
-            self.printer.format("\n{s}\n", .{current_command.help});
-        }
-        if (current_command.description) |desc| {
-            self.printer.format("\n{s}\n", .{desc});
-        }
-
-        if (current_command.subcommands) |sc_list| {
-            self.printer.printInColor(self.help_config.color_section, "\nCOMMANDS:\n");
-
-            var max_cmd_width: usize = 0;
-            for (sc_list) |sc| {
-                max_cmd_width = @max(max_cmd_width, sc.name.len);
+        if (cmd.description) |desc| {
+            self.printer.format("\n{s}\n", .{desc.one_line});
+            if (desc.detailed) |det| {
+                self.printer.format("\n{s}\n", .{det});
             }
-            const cmd_column_width = max_cmd_width + 3;
-            for (sc_list) |sc| {
-                self.printer.printColor(self.help_config.color_option);
-                self.printer.format("  {s}", .{sc.name});
-                self.printer.printColor(color_clear);
-                var i: usize = 0;
-                while (i < cmd_column_width - sc.name.len) {
-                    self.printer.write(" ");
-                    i += 1;
+        }
+
+        switch (cmd.target) {
+            .action => |act| {
+                if (act.positional_args) |pargs| {
+                    self.printer.printInColor(self.help_config.color_section, "\nARGUMENTS:\n");
+                    var max_arg_width: usize = 0;
+                    for (pargs.args) |parg| {
+                        max_arg_width = @max(max_arg_width, parg.name.len);
+                    }
+                    for (pargs.args) |parg| {
+                        self.printer.write("  ");
+                        self.printer.printInColor(self.help_config.color_option, parg.name);
+                        self.printer.printSpaces(max_arg_width - parg.name.len + 3);
+                        self.printer.write(parg.help);
+                        self.printer.printNewLine();
+                    }
                 }
+            },
+            .subcommands => |sc_list| {
+                self.printer.printInColor(self.help_config.color_section, "\nCOMMANDS:\n");
 
-                self.printer.format("{s}\n", .{sc.help});
-            }
+                var max_cmd_width: usize = 0;
+                for (sc_list) |sc| {
+                    max_cmd_width = @max(max_cmd_width, sc.name.len);
+                }
+                const cmd_column_width = max_cmd_width + 3;
+                for (sc_list) |sc| {
+                    self.printer.printColor(self.help_config.color_option);
+                    self.printer.format("  {s}", .{sc.name});
+                    self.printer.printColor(color_clear);
+                    if (sc.description) |desc| {
+                        var i: usize = 0;
+                        while (i < cmd_column_width - sc.name.len) {
+                            self.printer.write(" ");
+                            i += 1;
+                        }
+
+                        self.printer.format("{s}", .{desc.one_line});
+                    }
+                    self.printer.printNewLine();
+                }
+            },
         }
 
         self.printer.printInColor(self.help_config.color_section, "\nOPTIONS:\n");
         var option_column_width: usize = 7;
-        if (current_command.options) |option_list| {
+        if (cmd.options) |option_list| {
             var max_option_width: usize = 0;
             for (option_list) |option| {
                 const w = option.long_name.len + option.value_name.len + 3;

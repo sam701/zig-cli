@@ -40,7 +40,7 @@ pub const ValueRef = struct {
     }
 };
 
-const ValueType = union(enum) {
+pub const ValueType = union(enum) {
     single,
     multi: ValueList,
 };
