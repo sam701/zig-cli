@@ -6,7 +6,7 @@
 		.@"zig-cli" = .{
 			// URL pattern: https://github.com/sam701/zig-cli/archive/<commit hash>.tar.gz
 			.url = "https://github.com/sam701/zig-cli/archive/ddf49596a9225c91e6cd9c28904aec598d5becf0.tar.gz",
-			.hash = "1220249b6509b36d646a5d2c5da6dfd6fdde7328c67ed9e31eb4f0b30557972ca3e7",
+			.hash = "1220787d26a153a3755d55c8b65af53f7b1c4d79add4a47e2898dc776f3a16f1ce89",
 	    },
 	},
 }
