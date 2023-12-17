@@ -1,5 +1,5 @@
 const std = @import("std");
-const ValueRef = @import("./value_ref.zig").ValueRef;
+pub const ValueRef = @import("./value_ref.zig").ValueRef;
 
 pub const App = struct {
     command: Command,
@@ -30,7 +30,7 @@ pub const HelpConfig = struct {
 pub const Command = struct {
     name: []const u8,
     description: ?Description = null,
-    options: ?[]const *Option = null,
+    options: ?[]const *const Option = null,
     target: CommandTarget,
 };
 
@@ -56,7 +56,7 @@ pub const Option = struct {
     short_alias: ?u8 = null,
     help: []const u8,
     required: bool = false,
-    value_ref: ValueRef,
+    value_ref: *ValueRef,
     value_name: []const u8 = "VALUE",
     envvar: ?[]const u8 = null,
 };

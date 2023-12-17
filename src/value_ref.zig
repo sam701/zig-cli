@@ -48,6 +48,12 @@ pub const ValueType = union(enum) {
 const AllocError = Allocator.Error;
 pub const Error = AllocError; // | error{NotImplemented};
 
+pub fn allocRef(dest: anytype, alloc: Allocator) *ValueRef {
+    const ref_ptr = alloc.create(ValueRef) catch unreachable;
+    ref_ptr.* = mkRef(dest);
+    return ref_ptr;
+}
+
 pub fn mkRef(dest: anytype) ValueRef {
     const ti = @typeInfo(@TypeOf(dest));
     const t = ti.Pointer.child;

@@ -13,25 +13,7 @@ const str_false = value_parser.str_false;
 
 pub const ParseResult = command.ExecFn;
 
-pub fn run(app: *const command.App, alloc: Allocator) anyerror!void {
-    var iter = try std.process.argsWithAllocator(alloc);
-    defer iter.deinit();
-
-    var cr = try Parser(std.process.ArgIterator).init(app, iter, alloc);
-    defer cr.deinit();
-
-    const action = try cr.parse();
-    return action();
-}
-
 var help_option_set: bool = false;
-
-var help_option = command.Option{
-    .long_name = "help",
-    .help = "Show this help output.",
-    .short_alias = 'h',
-    .value_ref = mkRef(&help_option_set),
-};
 
 pub fn Parser(comptime Iterator: type) type {
     return struct {
@@ -43,6 +25,8 @@ pub fn Parser(comptime Iterator: type) type {
         command_path: std.ArrayList(*const command.Command),
         position_argument_ix: usize = 0,
         next_arg: ?[]const u8 = null,
+        color_option: command.Option,
+        help_option: command.Option = undefined,
 
         pub fn init(app: *const command.App, it: Iterator, alloc: Allocator) !Self {
             return Self{
@@ -50,6 +34,17 @@ pub fn Parser(comptime Iterator: type) type {
                 .arg_iterator = it,
                 .app = app,
                 .command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16),
+                .color_option = command.Option{
+                    .long_name = "color",
+                    .help = "When to use colors (*auto*, never, always).",
+                    .value_ref = vref.allocRef(&app.help_config.color_usage, alloc),
+                },
+                // .help_option = command.Option{
+                //     .long_name = "help",
+                //     .help = "Show this help output.",
+                //     .short_alias = 'h',
+                //     .value_ref = @ptrFromInt(0),
+                // },
             };
         }
 
@@ -151,7 +146,7 @@ pub fn Parser(comptime Iterator: type) type {
             }
         }
 
-        fn set_option_value_from_envvar(self: *const Self, opt: *command.Option) !void {
+        fn set_option_value_from_envvar(self: *const Self, opt: *const command.Option) !void {
             if (opt.value_ref.element_count > 0) return;
 
             if (opt.envvar) |envvar_name| {
@@ -234,7 +229,7 @@ pub fn Parser(comptime Iterator: type) type {
         }
 
         fn process_option(self: *Self, option_interpretation: *const argp.OptionInterpretation) !void {
-            var opt: *command.Option = switch (option_interpretation.option_type) {
+            var opt: *const command.Option = switch (option_interpretation.option_type) {
                 .long => self.find_option_by_name(option_interpretation.name),
                 .short => a: {
                     self.set_concatenated_boolean_options(self.current_command(), option_interpretation.name[0 .. option_interpretation.name.len - 1]);
@@ -242,7 +237,7 @@ pub fn Parser(comptime Iterator: type) type {
                 },
             };
 
-            if (opt == &help_option) {
+            if (opt == &self.help_option) {
                 try help.print_command_help(self.app, try self.command_path.toOwnedSlice());
                 std.os.exit(0);
             }
@@ -294,9 +289,11 @@ pub fn Parser(comptime Iterator: type) type {
             std.os.exit(1);
         }
 
-        fn find_option_by_name(self: *const Self, option_name: []const u8) *command.Option {
+        fn find_option_by_name(self: *const Self, option_name: []const u8) *const command.Option {
             if (std.mem.eql(u8, "help", option_name)) {
-                return &help_option;
+                return &self.help_option;
+                // } else if (std.mem.eql(u8, "color", option_name)) {
+                //     return &self.color_option;
             }
             for (0..self.command_path.items.len) |ix| {
                 const cmd = self.command_path.items[self.command_path.items.len - ix - 1];
@@ -312,9 +309,9 @@ pub fn Parser(comptime Iterator: type) type {
             unreachable;
         }
 
-        fn find_option_by_alias(self: *const Self, cmd: *const command.Command, option_alias: u8) *command.Option {
+        fn find_option_by_alias(self: *const Self, cmd: *const command.Command, option_alias: u8) *const command.Option {
             if (option_alias == 'h') {
-                return &help_option;
+                return &self.help_option;
             }
             if (cmd.options) |option_list| {
                 for (option_list) |option| {
