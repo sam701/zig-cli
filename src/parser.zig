@@ -254,9 +254,8 @@ pub fn Parser(comptime Iterator: type) type {
             if (std.mem.eql(u8, "help", option_name)) {
                 return &help_option;
             }
-            var ix = self.command_path.items.len - 1;
-            while (ix >= 0) : (ix -= 1) {
-                const cmd = self.command_path.items[ix];
+            for (0..self.command_path.items.len) |ix| {
+                const cmd = self.command_path.items[self.command_path.items.len - ix - 1];
                 if (cmd.options) |option_list| {
                     for (option_list) |option| {
                         if (std.mem.eql(u8, option.long_name, option_name)) {
