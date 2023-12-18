@@ -7,6 +7,9 @@ const argp = @import("./arg.zig");
 const Printer = @import("./Printer.zig");
 const vref = @import("./value_ref.zig");
 const mkRef = vref.mkRef;
+const value_parser = @import("value_parser.zig");
+const str_true = value_parser.str_true;
+const str_false = value_parser.str_false;
 
 pub const ParseResult = command.ExecFn;
 
@@ -39,6 +42,7 @@ pub fn Parser(comptime Iterator: type) type {
         app: *const command.App,
         command_path: std.ArrayList(*const command.Command),
         position_argument_ix: usize = 0,
+        next_arg: ?[]const u8 = null,
 
         pub fn init(app: *const command.App, it: Iterator, alloc: Allocator) !Self {
             return Self{
@@ -60,9 +64,9 @@ pub fn Parser(comptime Iterator: type) type {
         pub fn parse(self: *Self) anyerror!ParseResult {
             try self.command_path.append(&self.app.command);
 
-            _ = self.next_arg();
+            _ = self.nextArg();
             var args_only = false;
-            while (self.next_arg()) |arg| {
+            while (self.nextArg()) |arg| {
                 if (args_only) {
                     try self.handlePositionalArgument(arg);
                 } else if (argp.interpret(arg)) |interpretation| {
@@ -207,8 +211,17 @@ pub fn Parser(comptime Iterator: type) type {
             return args_only;
         }
 
-        fn next_arg(self: *Self) ?[]const u8 {
+        fn nextArg(self: *Self) ?[]const u8 {
+            if (self.next_arg) |arg| {
+                self.next_arg = null;
+                return arg;
+            }
             return self.arg_iterator.next();
+        }
+
+        fn putArgBack(self: *Self, value: []const u8) void {
+            std.debug.assert(self.next_arg == null);
+            self.next_arg = value;
         }
 
         fn process_option(self: *Self, option_interpretation: *const argp.OptionInterpretation) !void {
@@ -226,10 +239,32 @@ pub fn Parser(comptime Iterator: type) type {
             }
 
             if (opt.value_ref.value_data.is_bool) {
-                try opt.value_ref.put("true", self.alloc);
-                // TODO: bool argument can be explicitly passed as a value
+                if (option_interpretation.value) |opt_value| {
+                    var lw = try self.alloc.alloc(u8, opt_value.len);
+                    defer self.alloc.free(lw);
+
+                    lw = std.ascii.lowerString(lw, opt_value);
+                    try opt.value_ref.put(lw, self.alloc);
+                    return;
+                }
+
+                const following_arg = self.nextArg();
+                if (following_arg) |arg| {
+                    if (arg.len > 0 and arg[0] != '-') {
+                        var lw = try self.alloc.alloc(u8, arg.len);
+                        defer self.alloc.free(lw);
+
+                        lw = std.ascii.lowerString(lw, arg);
+                        if (std.mem.eql(u8, lw, str_true) or std.mem.eql(u8, lw, str_false)) {
+                            try opt.value_ref.put(lw, self.alloc);
+                            return;
+                        }
+                    }
+                    self.putArgBack(arg);
+                }
+                try opt.value_ref.put(str_true, self.alloc);
             } else {
-                const arg = option_interpretation.value orelse self.next_arg() orelse {
+                const arg = option_interpretation.value orelse self.nextArg() orelse {
                     self.fail("missing argument for {s}", .{opt.long_name});
                     unreachable;
                 };

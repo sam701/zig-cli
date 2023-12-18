@@ -130,6 +130,33 @@ test "int and float" {
     try expect(15.25 == bb);
 }
 
+test "bools" {
+    var aa: bool = true;
+    var bb: bool = false;
+    var cc: bool = false;
+    var aa_opt = command.Option{
+        .long_name = "aa",
+        .help = "option aa",
+        .value_ref = mkRef(&aa),
+    };
+    var bb_opt = command.Option{
+        .long_name = "bb",
+        .help = "option bb",
+        .value_ref = mkRef(&bb),
+    };
+    var cc_opt = command.Option{
+        .long_name = "cc",
+        .short_alias = 'c',
+        .help = "option cc",
+        .value_ref = mkRef(&cc),
+    };
+
+    try runOptions(&.{ "abc", "--aa=faLSE", "-c", "--bb", "trUE" }, &.{ &aa_opt, &bb_opt, &cc_opt });
+    try expect(!aa);
+    try expect(bb);
+    try expect(cc);
+}
+
 test "optional values" {
     var aa: ?i32 = null;
     var bb: ?f32 = 500;

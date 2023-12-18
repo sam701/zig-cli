@@ -54,6 +54,9 @@ fn floatData(comptime ValueType: type, comptime DestinationType: type) ValueData
     };
 }
 
+pub const str_true = "true";
+pub const str_false = "false";
+
 fn boolData(comptime DestinationType: type) ValueData {
     return .{
         .value_size = @sizeOf(DestinationType),
@@ -61,7 +64,12 @@ fn boolData(comptime DestinationType: type) ValueData {
         .value_parser = struct {
             fn parser(dest: *anyopaque, value: []const u8) anyerror!void {
                 const dt: *DestinationType = @ptrCast(@alignCast(dest));
-                dt.* = std.mem.eql(u8, value, "true");
+
+                if (std.mem.eql(u8, value, str_true)) {
+                    dt.* = true;
+                } else if (std.mem.eql(u8, value, str_false)) {
+                    dt.* = false;
+                } else return error.ParseBoolError;
             }
         }.parser,
         .type_name = "bool",
