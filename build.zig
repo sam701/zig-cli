@@ -25,13 +25,13 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&run_tests.step);
 
-    const simple = b.addExecutable(.{
-        .name = "simple",
-        .root_source_file = .{ .path = "examples/simple.zig" },
-        .optimize = optimize,
-    });
-    simple.addModule("zig-cli", module);
-    b.installArtifact(simple);
+    // const simple = b.addExecutable(.{
+    //     .name = "simple",
+    //     .root_source_file = .{ .path = "examples/simple.zig" },
+    //     .optimize = optimize,
+    // });
+    // simple.addModule("zig-cli", module);
+    // b.installArtifact(simple);
 
     const short = b.addExecutable(.{
         .name = "short",
@@ -41,6 +41,6 @@ pub fn build(b: *std.Build) void {
     short.addModule("zig-cli", module);
     b.installArtifact(short);
 
-    b.default_step.dependOn(&simple.step);
+    // b.default_step.dependOn(&simple.step);
     b.default_step.dependOn(&short.step);
 }

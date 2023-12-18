@@ -71,5 +71,5 @@ pub const PositionalArgs = struct {
 pub const PositionalArg = struct {
     name: []const u8,
     help: []const u8,
-    value_ref: ValueRef,
+    value_ref: *ValueRef,
 };

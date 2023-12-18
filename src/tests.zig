@@ -3,9 +3,9 @@ const Allocator = std.mem.Allocator;
 
 const command = @import("./command.zig");
 const ppack = @import("./parser.zig");
-const mkRef = @import("./value_ref.zig").mkRef;
 const Parser = ppack.Parser;
 const ParseResult = ppack.ParseResult;
+const AppRunner = @import("app_runner.zig").AppRunner;
 
 const expect = std.testing.expect;
 const alloc = std.testing.allocator;
@@ -24,6 +24,10 @@ const StringSliceIterator = struct {
         }
     }
 };
+
+fn runner() *AppRunner {
+    return AppRunner.init(alloc) catch unreachable;
+}
 
 fn run(app: *const command.App, items: []const []const u8) !void {
     const it = StringSliceIterator{
@@ -60,11 +64,13 @@ fn runOptions(input: []const []const u8, options: []const *command.Option) !void
 }
 
 test "long option" {
+    var r = runner();
+    defer r.deinit();
     var aa: []const u8 = "test";
     var opt = command.Option{
         .long_name = "aa",
         .help = "option aa",
-        .value_ref = mkRef(&aa),
+        .value_ref = r.mkRef(&aa),
     };
 
     try runOptions(&.{ "cmd", "--aa", "val" }, &.{&opt});
@@ -75,12 +81,14 @@ test "long option" {
 }
 
 test "short option" {
+    var r = runner();
+    defer r.deinit();
     var aa: []const u8 = undefined;
     var opt = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
-        .value_ref = mkRef(&aa),
+        .value_ref = r.mkRef(&aa),
     };
 
     try runOptions(&.{ "abc", "-a", "val" }, &.{&opt});
@@ -91,19 +99,21 @@ test "short option" {
 }
 
 test "concatenated aliases" {
+    var r = runner();
+    defer r.deinit();
     var aa: []const u8 = undefined;
     var bb: bool = false;
     var bbopt = command.Option{
         .long_name = "bb",
         .short_alias = 'b',
         .help = "option bb",
-        .value_ref = mkRef(&bb),
+        .value_ref = r.mkRef(&bb),
     };
     var opt = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
-        .value_ref = mkRef(&aa),
+        .value_ref = r.mkRef(&aa),
     };
 
     try runOptions(&.{ "abc", "-ba", "val" }, &.{ &opt, &bbopt });
@@ -112,17 +122,19 @@ test "concatenated aliases" {
 }
 
 test "int and float" {
+    var r = runner();
+    defer r.deinit();
     var aa: i32 = undefined;
     var bb: f64 = undefined;
     var aa_opt = command.Option{
         .long_name = "aa",
         .help = "option aa",
-        .value_ref = mkRef(&aa),
+        .value_ref = r.mkRef(&aa),
     };
     var bb_opt = command.Option{
         .long_name = "bb",
         .help = "option bb",
-        .value_ref = mkRef(&bb),
+        .value_ref = r.mkRef(&bb),
     };
 
     try runOptions(&.{ "abc", "--aa=34", "--bb", "15.25" }, &.{ &aa_opt, &bb_opt });
@@ -131,24 +143,26 @@ test "int and float" {
 }
 
 test "bools" {
+    var r = runner();
+    defer r.deinit();
     var aa: bool = true;
     var bb: bool = false;
     var cc: bool = false;
     var aa_opt = command.Option{
         .long_name = "aa",
         .help = "option aa",
-        .value_ref = mkRef(&aa),
+        .value_ref = r.mkRef(&aa),
     };
     var bb_opt = command.Option{
         .long_name = "bb",
         .help = "option bb",
-        .value_ref = mkRef(&bb),
+        .value_ref = r.mkRef(&bb),
     };
     var cc_opt = command.Option{
         .long_name = "cc",
         .short_alias = 'c',
         .help = "option cc",
-        .value_ref = mkRef(&cc),
+        .value_ref = r.mkRef(&cc),
     };
 
     try runOptions(&.{ "abc", "--aa=faLSE", "-c", "--bb", "trUE" }, &.{ &aa_opt, &bb_opt, &cc_opt });
@@ -158,6 +172,8 @@ test "bools" {
 }
 
 test "optional values" {
+    var r = runner();
+    defer r.deinit();
     var aa: ?i32 = null;
     var bb: ?f32 = 500;
     var cc: ?f32 = null;
@@ -165,17 +181,17 @@ test "optional values" {
     var aa_opt = command.Option{
         .long_name = "aa",
         .help = "option aa",
-        .value_ref = mkRef(&aa),
+        .value_ref = r.mkRef(&aa),
     };
     var bb_opt = command.Option{
         .long_name = "bb",
         .help = "option bb",
-        .value_ref = mkRef(&bb),
+        .value_ref = r.mkRef(&bb),
     };
     var cc_opt = command.Option{
         .long_name = "cc",
         .help = "option cc",
-        .value_ref = mkRef(&cc),
+        .value_ref = r.mkRef(&cc),
     };
 
     try runOptions(&.{ "abc", "--aa=34", "--bb", "15.25" }, &.{ &aa_opt, &bb_opt, &cc_opt });
@@ -185,12 +201,14 @@ test "optional values" {
 }
 
 test "int list" {
+    var r = runner();
+    defer r.deinit();
     var aa: []u64 = undefined;
     var aa_opt = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
-        .value_ref = mkRef(&aa),
+        .value_ref = r.mkRef(&aa),
     };
 
     try runOptions(&.{ "abc", "--aa=100", "--aa", "200", "-a", "300", "-a=400" }, &.{&aa_opt});
@@ -204,12 +222,14 @@ test "int list" {
 }
 
 test "string list" {
+    var r = runner();
+    defer r.deinit();
     var aa: [][]const u8 = undefined;
     var aa_opt = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
-        .value_ref = mkRef(&aa),
+        .value_ref = r.mkRef(&aa),
     };
 
     try runOptions(&.{ "abc", "--aa=a1", "--aa", "a2", "-a", "a3", "-a=a4" }, &.{&aa_opt});
@@ -223,6 +243,8 @@ test "string list" {
 }
 
 test "mix positional arguments and options" {
+    var r = runner();
+    defer r.deinit();
     var arg1: u32 = 0;
     var args: []const []const u8 = undefined;
     var aav: []const u8 = undefined;
@@ -231,22 +253,22 @@ test "mix positional arguments and options" {
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
-        .value_ref = mkRef(&aav),
+        .value_ref = r.mkRef(&aav),
     };
     var bb = command.Option{
         .long_name = "bb",
         .help = "option bb",
-        .value_ref = mkRef(&bbv),
+        .value_ref = r.mkRef(&bbv),
     };
     var parg1 = command.PositionalArg{
         .name = "abc1",
         .help = "help",
-        .value_ref = mkRef(&arg1),
+        .value_ref = r.mkRef(&arg1),
     };
     var parg2 = command.PositionalArg{
         .name = "abc",
         .help = "help",
-        .value_ref = mkRef(&args),
+        .value_ref = r.mkRef(&args),
     };
 
     try runOptionsPArgs(&.{ "cmd", "--bb", "tt", "178", "-a", "val", "arg2", "--", "--arg3", "-arg4" }, &.{ &aa, &bb }, &.{ &parg1, &parg2 });
@@ -262,6 +284,8 @@ test "mix positional arguments and options" {
 }
 
 test "parse enums" {
+    var r = runner();
+    defer r.deinit();
     const Aa = enum {
         cc,
         dd,
@@ -271,7 +295,7 @@ test "parse enums" {
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
-        .value_ref = mkRef(&aa),
+        .value_ref = r.mkRef(&aa),
     };
 
     try runOptions(&.{ "abc", "--aa=cc", "--aa", "dd" }, &.{&aa_opt});

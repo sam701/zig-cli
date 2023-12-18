@@ -61,10 +61,10 @@ var sub1 = cli.Command{
         ,
     },
     .options = &.{
-        &ip_option,
-        &int_option,
-        &bool_option,
-        &float_option,
+        ip_option,
+        int_option,
+        bool_option,
+        float_option,
     },
     .target = cli.CommandTarget{
         .subcommands = &.{ &sub2, &sub3 },

@@ -2,17 +2,18 @@ const std = @import("std");
 const command = @import("command.zig");
 const Printer = @import("Printer.zig");
 const value_ref = @import("value_ref.zig");
+const GlobalOptions = @import("GlobalOptions.zig");
 
 const color_clear = "0";
 
 pub fn print_command_help(
     app: *const command.App,
     command_path: []const *const command.Command,
-    global_options: []const *const command.Option,
+    global_options: *const GlobalOptions,
 ) !void {
     const stdout = std.io.getStdOut();
     var help_printer = HelpPrinter{
-        .printer = Printer.init(stdout, app.help_config.color_usage),
+        .printer = Printer.init(stdout, global_options.color_usage),
         .help_config = &app.help_config,
         .global_options = global_options,
     };
@@ -26,7 +27,7 @@ pub fn print_command_help(
 const HelpPrinter = struct {
     printer: Printer,
     help_config: *const command.HelpConfig,
-    global_options: []const *const command.Option,
+    global_options: *const GlobalOptions,
 
     fn printAppHelp(self: *HelpPrinter, app: *const command.App, command_path: []const *const command.Command) void {
         self.printer.printColor(self.help_config.color_app_name);
@@ -137,7 +138,7 @@ const HelpPrinter = struct {
                 const w = option.long_name.len + option.value_name.len + 3;
                 max_option_width = @max(max_option_width, w);
             }
-            for (self.global_options) |option| {
+            for (self.global_options.options) |option| {
                 const w = option.long_name.len + option.value_name.len + 3;
                 max_option_width = @max(max_option_width, w);
             }
@@ -146,7 +147,7 @@ const HelpPrinter = struct {
                 self.printOption(option, option_column_width);
             }
         }
-        for (self.global_options) |option| {
+        for (self.global_options.options) |option| {
             self.printOption(option, option_column_width);
         }
     }

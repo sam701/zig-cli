@@ -7,6 +7,9 @@ const App = @import("command.zig").App;
 const Parser = @import("parser.zig").Parser;
 
 pub const AppRunner = struct {
+    // This arena and its allocator is intended to be used only for the value references
+    // that must be freed after the parsing is finished.
+    // For everything else the original allocator, i.e. arena.child_allocator should be used.
     arena: ArenaAllocator,
     alloc: Allocator,
 
@@ -20,16 +23,23 @@ pub const AppRunner = struct {
         return sptr;
     }
 
+    pub fn deinit(self: *Self) void {
+        self.arena.deinit();
+    }
+
     pub fn mkRef(self: *Self, dest: anytype) *ValueRef {
         return value_ref.allocRef(dest, self.alloc);
     }
 
     pub fn run(self: *Self, app: *const App) anyerror!void {
         const iter = try std.process.argsWithAllocator(self.alloc);
-        var cr = try Parser(std.process.ArgIterator).init(app, iter, self.alloc);
+
+        // Here we pass the child allocator because any values allocated on the client behalf may not be freed.
+        var cr = try Parser(std.process.ArgIterator).init(app, iter, self.arena.child_allocator);
+        defer cr.deinit();
 
         const action = try cr.parse();
-        self.arena.deinit();
+        self.deinit();
         return action();
     }
 };
