@@ -155,18 +155,22 @@ pub fn Parser(comptime Iterator: type) type {
             if (opt.value_ref.element_count > 0) return;
 
             if (opt.envvar) |envvar_name| {
-                if (std.os.getenv(envvar_name)) |value| {
+                if (std.process.getEnvVarOwned(self.alloc, envvar_name)) |value| {
+                    defer self.alloc.free(value);
                     opt.value_ref.put(value, self.alloc) catch |err| {
                         self.fail("envvar({s}): cannot parse {s} value '{s}': {s}", .{ envvar_name, opt.value_ref.value_data.type_name, value, @errorName(err) });
                         unreachable;
                     };
+                } else |err| {
+                    if (err != std.process.GetEnvVarOwnedError.EnvironmentVariableNotFound) {
+                        return err;
+                    }
                 }
             } else if (self.app.option_envvar_prefix) |prefix| {
-                var envvar_name = try self.alloc.alloc(u8, opt.long_name.len + prefix.len + 1);
+                var envvar_name = try self.alloc.alloc(u8, opt.long_name.len + prefix.len);
                 defer self.alloc.free(envvar_name);
                 @memcpy(envvar_name[0..prefix.len], prefix);
-                envvar_name[prefix.len] = '_';
-                for (envvar_name[prefix.len + 1 ..], opt.long_name) |*dest, name_char| {
+                for (envvar_name[prefix.len..], opt.long_name) |*dest, name_char| {
                     if (name_char == '-') {
                         dest.* = '_';
                     } else {
@@ -174,11 +178,16 @@ pub fn Parser(comptime Iterator: type) type {
                     }
                 }
 
-                if (std.os.getenv(envvar_name)) |value| {
+                if (std.process.getEnvVarOwned(self.alloc, envvar_name)) |value| {
+                    defer self.alloc.free(value);
                     opt.value_ref.put(value, self.alloc) catch |err| {
                         self.fail("envvar({s}): cannot parse {s} value '{s}': {s}", .{ envvar_name, opt.value_ref.value_data.type_name, value, @errorName(err) });
                         unreachable;
                     };
+                } else |err| {
+                    if (err != std.process.GetEnvVarOwnedError.EnvironmentVariableNotFound) {
+                        return err;
+                    }
                 }
             }
         }
