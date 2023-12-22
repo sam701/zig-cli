@@ -14,8 +14,6 @@ const GlobalOptions = @import("GlobalOptions.zig");
 
 pub const ParseResult = command.ExecFn;
 
-var help_option_set: bool = false;
-
 pub fn Parser(comptime Iterator: type) type {
     return struct {
         const Self = @This();
@@ -281,12 +279,6 @@ pub fn Parser(comptime Iterator: type) type {
         }
 
         fn find_option_by_name(self: *const Self, option_name: []const u8) *const command.Option {
-            if (std.mem.eql(u8, "help", option_name)) {
-                return self.global_options.option_show_help;
-            }
-            if (std.mem.eql(u8, "color", option_name)) {
-                return self.global_options.option_color_usage;
-            }
             for (0..self.command_path.items.len) |ix| {
                 const cmd = self.command_path.items[self.command_path.items.len - ix - 1];
                 if (cmd.options) |option_list| {
@@ -295,6 +287,11 @@ pub fn Parser(comptime Iterator: type) type {
                             return option;
                         }
                     }
+                }
+            }
+            for (self.global_options.options) |option| {
+                if (std.mem.eql(u8, option.long_name, option_name)) {
+                    return option;
                 }
             }
             self.fail("no such option '--{s}'", .{option_name});

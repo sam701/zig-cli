@@ -133,16 +133,17 @@ const HelpPrinter = struct {
         self.printer.printInColor(self.help_config.color_section, "\nOPTIONS:\n");
         var option_column_width: usize = 7;
         if (cmd.options) |option_list| {
-            var max_option_width: usize = 0;
             for (option_list) |option| {
                 const w = option.long_name.len + option.value_name.len + 3;
-                max_option_width = @max(max_option_width, w);
+                option_column_width = @max(option_column_width, w);
             }
-            for (self.global_options.options) |option| {
-                const w = option.long_name.len + option.value_name.len + 3;
-                max_option_width = @max(max_option_width, w);
-            }
-            option_column_width = max_option_width + 3;
+        }
+        for (self.global_options.options) |option| {
+            const w = option.long_name.len + option.value_name.len + 3;
+            option_column_width = @max(option_column_width, w);
+        }
+        option_column_width += 3;
+        if (cmd.options) |option_list| {
             for (option_list) |option| {
                 self.printOption(option, option_column_width);
             }

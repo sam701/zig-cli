@@ -62,7 +62,7 @@ pub const Option = struct {
 };
 
 pub const PositionalArgs = struct {
-    args: []const *PositionalArg,
+    args: []const *const PositionalArg,
 
     /// If not set, all positional arguments are considered as required.
     first_optional_arg: ?*const PositionalArg = null,

@@ -13,105 +13,100 @@ var config = struct {
     arg2: []const []const u8 = undefined,
 }{};
 
-var ip_option = cli.Option{
-    .long_name = "ip",
-    .help = "this is the IP address",
-    .short_alias = 'i',
-    .value_ref = cli.mkRef(&config.ip),
-    .required = true,
-    .value_name = "IP",
-};
-var int_option = cli.Option{
-    .long_name = "int",
-    .help = "this is an int",
-    .value_ref = cli.mkRef(&config.int),
-};
-var bool_option = cli.Option{
-    .long_name = "bool",
-    .short_alias = 'b',
-    .help = "this is a bool",
-    .value_ref = cli.mkRef(&config.bool),
-};
-var float_option = cli.Option{
-    .long_name = "float",
-    .help = "this is a float",
-    .value_ref = cli.mkRef(&config.float),
-};
+pub fn main() anyerror!void {
+    var r = try cli.AppRunner.init(std.heap.page_allocator);
 
-var arg1 = cli.PositionalArg{
-    .name = "ARG1",
-    .help = "arg1 help",
-    .value_ref = cli.mkRef(&config.arg1),
-};
+    const arg1 = cli.PositionalArg{
+        .name = "ARG1",
+        .help = "arg1 help",
+        .value_ref = r.mkRef(&config.arg1),
+    };
 
-var arg2 = cli.PositionalArg{
-    .name = "ARG2",
-    .help = "multiple arg2 help",
-    .value_ref = cli.mkRef(&config.arg2),
-};
+    const arg2 = cli.PositionalArg{
+        .name = "ARG2",
+        .help = "multiple arg2 help",
+        .value_ref = r.mkRef(&config.arg2),
+    };
 
-var sub1 = cli.Command{
-    .name = "sub1",
-    .description = cli.Description{
-        .one_line = "another awesome command",
-        .detailed =
-        \\this is my awesome multiline description.
-        \\This is already line 2.
-        \\And this is line 3.
-        ,
-    },
-    .options = &.{
-        ip_option,
-        int_option,
-        bool_option,
-        float_option,
-    },
-    .target = cli.CommandTarget{
-        .subcommands = &.{ &sub2, &sub3 },
-    },
-};
-
-var sub2 = cli.Command{
-    .name = "sub2",
-    .target = cli.CommandTarget{
-        .action = cli.CommandAction{
-            .exec = run_sub2,
-        },
-    },
-};
-
-var sub3 = cli.Command{
-    .name = "sub3",
-    .description = cli.Description{
-        .one_line = "sub3 with positional arguments",
-    },
-    .target = cli.CommandTarget{
-        .action = cli.CommandAction{
-            .positional_args = cli.PositionalArgs{
-                .args = &.{ &arg1, &arg2 },
-                .first_optional_arg = &arg2,
+    const sub2 = cli.Command{
+        .name = "sub2",
+        .target = cli.CommandTarget{
+            .action = cli.CommandAction{
+                .exec = run_sub2,
             },
-            .exec = run_sub3,
         },
-    },
-};
+    };
 
-var app = &cli.App{
-    .command = cli.Command{
-        .name = "simple",
+    const sub3 = cli.Command{
+        .name = "sub3",
         .description = cli.Description{
-            .one_line = "This a simple CLI app. Enjoy!",
+            .one_line = "sub3 with positional arguments",
         },
         .target = cli.CommandTarget{
-            .subcommands = &.{&sub1},
+            .action = cli.CommandAction{
+                .positional_args = cli.PositionalArgs{
+                    .args = &.{ &arg1, &arg2 },
+                    .first_optional_arg = &arg2,
+                },
+                .exec = run_sub3,
+            },
         },
-    },
-    .version = "0.10.3",
-    .author = "sam701 & contributors",
-};
-
-pub fn main() anyerror!void {
-    return cli.run(app, allocator);
+    };
+    const app = cli.App{
+        .command = cli.Command{
+            .name = "simple",
+            .description = cli.Description{
+                .one_line = "This a simple CLI app. Enjoy!",
+            },
+            .target = cli.CommandTarget{
+                .subcommands = &.{
+                    &cli.Command{
+                        .name = "sub1",
+                        .description = cli.Description{
+                            .one_line = "another awesome command",
+                            .detailed =
+                            \\this is my awesome multiline description.
+                            \\This is already line 2.
+                            \\And this is line 3.
+                            ,
+                        },
+                        .options = &.{
+                            &cli.Option{
+                                .long_name = "ip",
+                                .help = "this is the IP address",
+                                .short_alias = 'i',
+                                .value_ref = r.mkRef(&config.ip),
+                                .required = true,
+                                .value_name = "IP",
+                            },
+                            &cli.Option{
+                                .long_name = "int",
+                                .help = "this is an int",
+                                .value_ref = r.mkRef(&config.int),
+                            },
+                            &cli.Option{
+                                .long_name = "bool",
+                                .short_alias = 'b',
+                                .help = "this is a bool",
+                                .value_ref = r.mkRef(&config.bool),
+                            },
+                            &cli.Option{
+                                .long_name = "float",
+                                .help = "this is a float",
+                                .value_ref = r.mkRef(&config.float),
+                            },
+                        },
+                        .target = cli.CommandTarget{
+                            .subcommands = &.{ &sub2, &sub3 },
+                        },
+                    },
+                },
+            },
+        },
+        .version = "0.10.3",
+        .author = "sam701 & contributors",
+    };
+    return r.run(&app);
 }
 
 fn run_sub3() anyerror!void {
