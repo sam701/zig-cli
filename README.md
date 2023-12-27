@@ -66,7 +66,7 @@ fn run_server() !void {
 See the [`standalone`](./examples/standalone) example in the `examples` folder.
 
 ## Printing help
-See [`simple.zig`](./example/simple.zig)
+See [`simple.zig`](./examples/simple.zig)
 
 ```
 $ ./zig-out/bin/simple sub1 --help
