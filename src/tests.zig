@@ -41,8 +41,8 @@ fn run(app: *const command.App, items: []const []const u8) !void {
 
 fn dummy_action() !void {}
 
-fn runOptionsPArgs(input: []const []const u8, options: []const *command.Option, pargs: ?[]const *command.PositionalArg) !void {
-    const pa = if (pargs) |p| command.PositionalArgs{ .args = p } else null;
+fn runOptionsPArgs(input: []const []const u8, options: []const command.Option, pargs: ?[]const command.PositionalArg) !void {
+    const pa = if (pargs) |p| command.PositionalArgs{ .required = p } else null;
     const app = command.App{
         .command = command.Command{
             .name = "cmd",
@@ -59,7 +59,7 @@ fn runOptionsPArgs(input: []const []const u8, options: []const *command.Option, 
     try run(&app, input);
 }
 
-fn runOptions(input: []const []const u8, options: []const *command.Option) !void {
+fn runOptions(input: []const []const u8, options: []const command.Option) !void {
     try runOptionsPArgs(input, options, null);
 }
 
@@ -67,16 +67,16 @@ test "long option" {
     var r = runner();
     defer r.deinit();
     var aa: []const u8 = "test";
-    var opt = command.Option{
+    const opt = command.Option{
         .long_name = "aa",
         .help = "option aa",
         .value_ref = r.mkRef(&aa),
     };
 
-    try runOptions(&.{ "cmd", "--aa", "val" }, &.{&opt});
+    try runOptions(&.{ "cmd", "--aa", "val" }, &.{opt});
     try std.testing.expectEqualStrings("val", aa);
 
-    try runOptions(&.{ "cmd", "--aa=bb" }, &.{&opt});
+    try runOptions(&.{ "cmd", "--aa=bb" }, &.{opt});
     try std.testing.expectEqualStrings("bb", aa);
 }
 
@@ -84,17 +84,17 @@ test "short option" {
     var r = runner();
     defer r.deinit();
     var aa: []const u8 = undefined;
-    var opt = command.Option{
+    const opt = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
         .value_ref = r.mkRef(&aa),
     };
 
-    try runOptions(&.{ "abc", "-a", "val" }, &.{&opt});
+    try runOptions(&.{ "abc", "-a", "val" }, &.{opt});
     try std.testing.expectEqualStrings("val", aa);
 
-    try runOptions(&.{ "abc", "-a=bb" }, &.{&opt});
+    try runOptions(&.{ "abc", "-a=bb" }, &.{opt});
     try std.testing.expectEqualStrings("bb", aa);
 }
 
@@ -103,20 +103,20 @@ test "concatenated aliases" {
     defer r.deinit();
     var aa: []const u8 = undefined;
     var bb: bool = false;
-    var bbopt = command.Option{
+    const bbopt = command.Option{
         .long_name = "bb",
         .short_alias = 'b',
         .help = "option bb",
         .value_ref = r.mkRef(&bb),
     };
-    var opt = command.Option{
+    const opt = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
         .value_ref = r.mkRef(&aa),
     };
 
-    try runOptions(&.{ "abc", "-ba", "val" }, &.{ &opt, &bbopt });
+    try runOptions(&.{ "abc", "-ba", "val" }, &.{ opt, bbopt });
     try std.testing.expectEqualStrings("val", aa);
     try expect(bb);
 }
@@ -126,18 +126,18 @@ test "int and float" {
     defer r.deinit();
     var aa: i32 = undefined;
     var bb: f64 = undefined;
-    var aa_opt = command.Option{
+    const aa_opt = command.Option{
         .long_name = "aa",
         .help = "option aa",
         .value_ref = r.mkRef(&aa),
     };
-    var bb_opt = command.Option{
+    const bb_opt = command.Option{
         .long_name = "bb",
         .help = "option bb",
         .value_ref = r.mkRef(&bb),
     };
 
-    try runOptions(&.{ "abc", "--aa=34", "--bb", "15.25" }, &.{ &aa_opt, &bb_opt });
+    try runOptions(&.{ "abc", "--aa=34", "--bb", "15.25" }, &.{ aa_opt, bb_opt });
     try expect(34 == aa);
     try expect(15.25 == bb);
 }
@@ -148,24 +148,24 @@ test "bools" {
     var aa: bool = true;
     var bb: bool = false;
     var cc: bool = false;
-    var aa_opt = command.Option{
+    const aa_opt = command.Option{
         .long_name = "aa",
         .help = "option aa",
         .value_ref = r.mkRef(&aa),
     };
-    var bb_opt = command.Option{
+    const bb_opt = command.Option{
         .long_name = "bb",
         .help = "option bb",
         .value_ref = r.mkRef(&bb),
     };
-    var cc_opt = command.Option{
+    const cc_opt = command.Option{
         .long_name = "cc",
         .short_alias = 'c',
         .help = "option cc",
         .value_ref = r.mkRef(&cc),
     };
 
-    try runOptions(&.{ "abc", "--aa=faLSE", "-c", "--bb", "trUE" }, &.{ &aa_opt, &bb_opt, &cc_opt });
+    try runOptions(&.{ "abc", "--aa=faLSE", "-c", "--bb", "trUE" }, &.{ aa_opt, bb_opt, cc_opt });
     try expect(!aa);
     try expect(bb);
     try expect(cc);
@@ -178,23 +178,23 @@ test "optional values" {
     var bb: ?f32 = 500;
     var cc: ?f32 = null;
 
-    var aa_opt = command.Option{
+    const aa_opt = command.Option{
         .long_name = "aa",
         .help = "option aa",
         .value_ref = r.mkRef(&aa),
     };
-    var bb_opt = command.Option{
+    const bb_opt = command.Option{
         .long_name = "bb",
         .help = "option bb",
         .value_ref = r.mkRef(&bb),
     };
-    var cc_opt = command.Option{
+    const cc_opt = command.Option{
         .long_name = "cc",
         .help = "option cc",
         .value_ref = r.mkRef(&cc),
     };
 
-    try runOptions(&.{ "abc", "--aa=34", "--bb", "15.25" }, &.{ &aa_opt, &bb_opt, &cc_opt });
+    try runOptions(&.{ "abc", "--aa=34", "--bb", "15.25" }, &.{ aa_opt, bb_opt, cc_opt });
     try expect(34 == aa.?);
     try expect(15.25 == bb.?);
     try std.testing.expect(cc == null);
@@ -204,14 +204,14 @@ test "int list" {
     var r = runner();
     defer r.deinit();
     var aa: []u64 = undefined;
-    var aa_opt = command.Option{
+    const aa_opt = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
         .value_ref = r.mkRef(&aa),
     };
 
-    try runOptions(&.{ "abc", "--aa=100", "--aa", "200", "-a", "300", "-a=400" }, &.{&aa_opt});
+    try runOptions(&.{ "abc", "--aa=100", "--aa", "200", "-a", "300", "-a=400" }, &.{aa_opt});
     try expect(aa.len == 4);
     try expect(aa[0] == 100);
     try expect(aa[1] == 200);
@@ -225,14 +225,14 @@ test "string list" {
     var r = runner();
     defer r.deinit();
     var aa: [][]const u8 = undefined;
-    var aa_opt = command.Option{
+    const aa_opt = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
         .value_ref = r.mkRef(&aa),
     };
 
-    try runOptions(&.{ "abc", "--aa=a1", "--aa", "a2", "-a", "a3", "-a=a4" }, &.{&aa_opt});
+    try runOptions(&.{ "abc", "--aa=a1", "--aa", "a2", "-a", "a3", "-a=a4" }, &.{aa_opt});
     try expect(aa.len == 4);
     try std.testing.expectEqualStrings("a1", aa[0]);
     try std.testing.expectEqualStrings("a2", aa[1]);
@@ -249,29 +249,29 @@ test "mix positional arguments and options" {
     var args: []const []const u8 = undefined;
     var aav: []const u8 = undefined;
     var bbv: []const u8 = undefined;
-    var aa = command.Option{
+    const aa = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
         .value_ref = r.mkRef(&aav),
     };
-    var bb = command.Option{
+    const bb = command.Option{
         .long_name = "bb",
         .help = "option bb",
         .value_ref = r.mkRef(&bbv),
     };
-    var parg1 = command.PositionalArg{
+    const parg1 = command.PositionalArg{
         .name = "abc1",
         .help = "help",
         .value_ref = r.mkRef(&arg1),
     };
-    var parg2 = command.PositionalArg{
+    const parg2 = command.PositionalArg{
         .name = "abc",
         .help = "help",
         .value_ref = r.mkRef(&args),
     };
 
-    try runOptionsPArgs(&.{ "cmd", "--bb", "tt", "178", "-a", "val", "arg2", "--", "--arg3", "-arg4" }, &.{ &aa, &bb }, &.{ &parg1, &parg2 });
+    try runOptionsPArgs(&.{ "cmd", "--bb", "tt", "178", "-a", "val", "arg2", "--", "--arg3", "-arg4" }, &.{ aa, bb }, &.{ parg1, parg2 });
     defer std.testing.allocator.free(args);
 
     try std.testing.expectEqualStrings("val", aav);
@@ -291,14 +291,14 @@ test "parse enums" {
         dd,
     };
     var aa: []Aa = undefined;
-    var aa_opt = command.Option{
+    const aa_opt = command.Option{
         .long_name = "aa",
         .short_alias = 'a',
         .help = "option aa",
         .value_ref = r.mkRef(&aa),
     };
 
-    try runOptions(&.{ "abc", "--aa=cc", "--aa", "dd" }, &.{&aa_opt});
+    try runOptions(&.{ "abc", "--aa=cc", "--aa", "dd" }, &.{aa_opt});
     try std.testing.expect(2 == aa.len);
     try std.testing.expect(aa[0] == Aa.cc);
     try std.testing.expect(aa[1] == Aa.dd);

@@ -16,18 +16,6 @@ var config = struct {
 pub fn main() anyerror!void {
     var r = try cli.AppRunner.init(std.heap.page_allocator);
 
-    const arg1 = cli.PositionalArg{
-        .name = "ARG1",
-        .help = "arg1 help",
-        .value_ref = r.mkRef(&config.arg1),
-    };
-
-    const arg2 = cli.PositionalArg{
-        .name = "ARG2",
-        .help = "multiple arg2 help",
-        .value_ref = r.mkRef(&config.arg2),
-    };
-
     const sub2 = cli.Command{
         .name = "sub2",
         .target = cli.CommandTarget{
@@ -45,8 +33,20 @@ pub fn main() anyerror!void {
         .target = cli.CommandTarget{
             .action = cli.CommandAction{
                 .positional_args = cli.PositionalArgs{
-                    .args = &.{ &arg1, &arg2 },
-                    .first_optional_arg = &arg2,
+                    .required = &.{
+                        cli.PositionalArg{
+                            .name = "ARG1",
+                            .help = "arg1 help",
+                            .value_ref = r.mkRef(&config.arg1),
+                        },
+                    },
+                    .optional = &.{
+                        cli.PositionalArg{
+                            .name = "ARG2",
+                            .help = "multiple arg2 help",
+                            .value_ref = r.mkRef(&config.arg2),
+                        },
+                    },
                 },
                 .exec = run_sub3,
             },
@@ -60,7 +60,7 @@ pub fn main() anyerror!void {
             },
             .target = cli.CommandTarget{
                 .subcommands = &.{
-                    &cli.Command{
+                    cli.Command{
                         .name = "sub1",
                         .description = cli.Description{
                             .one_line = "another awesome command",
@@ -71,7 +71,7 @@ pub fn main() anyerror!void {
                             ,
                         },
                         .options = &.{
-                            &cli.Option{
+                            .{
                                 .long_name = "ip",
                                 .help = "this is the IP address",
                                 .short_alias = 'i',
@@ -79,25 +79,25 @@ pub fn main() anyerror!void {
                                 .required = true,
                                 .value_name = "IP",
                             },
-                            &cli.Option{
+                            .{
                                 .long_name = "int",
                                 .help = "this is an int",
                                 .value_ref = r.mkRef(&config.int),
                             },
-                            &cli.Option{
+                            .{
                                 .long_name = "bool",
                                 .short_alias = 'b',
                                 .help = "this is a bool",
                                 .value_ref = r.mkRef(&config.bool),
                             },
-                            &cli.Option{
+                            .{
                                 .long_name = "float",
                                 .help = "this is a float",
                                 .value_ref = r.mkRef(&config.float),
                             },
                         },
                         .target = cli.CommandTarget{
-                            .subcommands = &.{ &sub2, &sub3 },
+                            .subcommands = &.{ sub2, sub3 },
                         },
                     },
                 },

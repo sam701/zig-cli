@@ -3,6 +3,7 @@ const command = @import("command.zig");
 const Printer = @import("Printer.zig");
 const value_ref = @import("value_ref.zig");
 const GlobalOptions = @import("GlobalOptions.zig");
+const PositionalArgsHelper = @import("PositionalArgsHelper.zig");
 
 const color_clear = "0";
 
@@ -56,22 +57,25 @@ const HelpPrinter = struct {
         switch (cmd.target) {
             .action => |act| {
                 if (act.positional_args) |pargs| {
-                    var closeOpt = false;
-                    for (pargs.args) |parg| {
-                        self.printer.write(" ");
-                        if (pargs.first_optional_arg) |opt| {
-                            if (opt == parg) {
-                                self.printer.write("[");
-                                closeOpt = true;
+                    if (pargs.required) |req| {
+                        for (req) |*parg| {
+                            self.printer.write(" ");
+                            self.printer.format("<{s}>", .{parg.name});
+                            if (parg.value_ref.value_type == value_ref.ValueType.multi) {
+                                self.printer.write("...");
                             }
                         }
-                        self.printer.format("<{s}>", .{parg.name});
-                        if (parg.value_ref.value_type == value_ref.ValueType.multi) {
-                            self.printer.write("...");
-                        }
                     }
-                    if (closeOpt) {
-                        self.printer.write("]");
+                    if (pargs.optional) |opt| {
+                        for (opt) |*parg| {
+                            self.printer.write(" ");
+                            self.printer.write("[");
+                            self.printer.format("<{s}>", .{parg.name});
+                            if (parg.value_ref.value_type == value_ref.ValueType.multi) {
+                                self.printer.write("...");
+                            }
+                            self.printer.write("]");
+                        }
                     }
                 }
             },
@@ -89,13 +93,16 @@ const HelpPrinter = struct {
 
         switch (cmd.target) {
             .action => |act| {
-                if (act.positional_args) |pargs| {
+                if (act.positional_args) |*pargs| {
                     self.printer.printInColor(self.help_config.color_section, "\nARGUMENTS:\n");
                     var max_arg_width: usize = 0;
-                    for (pargs.args) |parg| {
+                    const arg_h = PositionalArgsHelper{ .inner = pargs };
+                    var it = arg_h.iterator();
+                    while (it.next()) |parg| {
                         max_arg_width = @max(max_arg_width, parg.name.len);
                     }
-                    for (pargs.args) |parg| {
+                    it.index = 0;
+                    while (it.next()) |parg| {
                         self.printer.write("  ");
                         self.printer.printInColor(self.help_config.color_option, parg.name);
                         self.printer.printSpaces(max_arg_width - parg.name.len + 3);
@@ -144,7 +151,7 @@ const HelpPrinter = struct {
         }
         option_column_width += 3;
         if (cmd.options) |option_list| {
-            for (option_list) |option| {
+            for (option_list) |*option| {
                 self.printOption(option, option_column_width);
             }
         }

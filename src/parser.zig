@@ -11,6 +11,7 @@ const value_parser = @import("value_parser.zig");
 const str_true = value_parser.str_true;
 const str_false = value_parser.str_false;
 const GlobalOptions = @import("GlobalOptions.zig");
+const PositionalArgsHelper = @import("PositionalArgsHelper.zig");
 
 pub const ParseResult = command.ExecFn;
 
@@ -67,7 +68,7 @@ pub fn Parser(comptime Iterator: type) type {
         fn finalize(self: *Self) !ParseResult {
             for (self.command_path.items) |cmd| {
                 if (cmd.options) |options| {
-                    for (options) |opt| {
+                    for (options) |*opt| {
                         try self.set_option_value_from_envvar(opt);
                         try opt.value_ref.finalize(self.alloc);
 
@@ -78,17 +79,14 @@ pub fn Parser(comptime Iterator: type) type {
                 }
                 switch (cmd.target) {
                     .action => |act| {
-                        if (act.positional_args) |pargs| {
-                            var optional = false;
-                            for (pargs.args) |parg| {
+                        if (act.positional_args) |*pargs| {
+                            const argh = PositionalArgsHelper{ .inner = pargs };
+                            var it = argh.iterator();
+                            const required_args_no = if (pargs.required) |req| req.len else 0;
+                            while (it.next()) |parg| {
                                 try parg.value_ref.finalize(self.alloc);
 
-                                if (pargs.first_optional_arg) |first_opt| {
-                                    if (parg == first_opt) {
-                                        optional = true;
-                                    }
-                                }
-                                if (!optional and parg.value_ref.element_count == 0) {
+                                if (it.index <= required_args_no and parg.value_ref.element_count == 0) {
                                     self.fail("missing required positional argument '{s}'", .{parg.name});
                                 }
                             }
@@ -116,12 +114,13 @@ pub fn Parser(comptime Iterator: type) type {
                     self.fail("command '{s}' cannot have positional arguments", .{cmd.name});
                 },
                 .action => |act| {
-                    if (act.positional_args) |posArgs| {
-                        if (self.position_argument_ix >= posArgs.args.len) {
+                    if (act.positional_args) |*posArgs| {
+                        var posH = PositionalArgsHelper{ .inner = posArgs };
+                        if (self.position_argument_ix >= posH.len()) {
                             self.fail("unexpected positional argument '{s}'", .{arg});
                         }
 
-                        const posArg = posArgs.args[self.position_argument_ix];
+                        const posArg = posH.at(self.position_argument_ix);
                         var posArgRef = posArg.value_ref;
                         posArgRef.put(arg, self.alloc) catch |err| {
                             self.fail("positional argument ({s}): cannot parse '{s}' as {s}: {s}", .{ posArg.name, arg, posArgRef.value_data.type_name, @errorName(err) });
@@ -187,7 +186,7 @@ pub fn Parser(comptime Iterator: type) type {
                     const cmd = self.current_command();
                     switch (cmd.target) {
                         .subcommands => |cmds| {
-                            for (cmds) |sc| {
+                            for (cmds) |*sc| {
                                 if (std.mem.eql(u8, sc.name, some_name)) {
                                     try self.command_path.append(sc);
                                     return false;
@@ -282,7 +281,7 @@ pub fn Parser(comptime Iterator: type) type {
             for (0..self.command_path.items.len) |ix| {
                 const cmd = self.command_path.items[self.command_path.items.len - ix - 1];
                 if (cmd.options) |option_list| {
-                    for (option_list) |option| {
+                    for (option_list) |*option| {
                         if (std.mem.eql(u8, option.long_name, option_name)) {
                             return option;
                         }
@@ -303,7 +302,7 @@ pub fn Parser(comptime Iterator: type) type {
                 return self.global_options.option_show_help;
             }
             if (cmd.options) |option_list| {
-                for (option_list) |option| {
+                for (option_list) |*option| {
                     if (option.short_alias) |alias| {
                         if (alias == option_alias) {
                             return option;

@@ -30,7 +30,7 @@ pub const HelpConfig = struct {
 pub const Command = struct {
     name: []const u8,
     description: ?Description = null,
-    options: ?[]const *const Option = null,
+    options: ?[]const Option = null,
     target: CommandTarget,
 };
 
@@ -40,7 +40,7 @@ pub const Description = struct {
 };
 
 pub const CommandTarget = union(enum) {
-    subcommands: []const *const Command,
+    subcommands: []const Command,
     action: CommandAction,
 };
 
@@ -62,10 +62,8 @@ pub const Option = struct {
 };
 
 pub const PositionalArgs = struct {
-    args: []const *const PositionalArg,
-
-    /// If not set, all positional arguments are considered as required.
-    first_optional_arg: ?*const PositionalArg = null,
+    required: ?[]const PositionalArg = null,
+    optional: ?[]const PositionalArg = null,
 };
 
 pub const PositionalArg = struct {

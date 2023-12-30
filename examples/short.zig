@@ -13,13 +13,13 @@ pub fn main() !void {
         .command = cli.Command{
             .name = "short",
             .options = &.{
-                &cli.Option{
+                .{
                     .long_name = "port",
                     .help = "port to bind to",
                     .required = true,
                     .value_ref = r.mkRef(&config.port),
                 },
-                &cli.Option{
+                .{
                     .long_name = "host",
                     .help = "host to listen on",
                     .value_ref = r.mkRef(&config.host),
