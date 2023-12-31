@@ -17,7 +17,7 @@ pub const ArgumentInterpretation = union(enum) {
     other: []const u8,
 };
 
-pub fn interpret(arg: []const u8) !ArgumentInterpretation {
+pub fn interpret(arg: []const u8) error{MissingOptionValue}!ArgumentInterpretation {
     if (arg.len == 0) return ArgumentInterpretation{ .other = arg };
 
     if (arg[0] == '-') {
@@ -32,7 +32,7 @@ pub fn interpret(arg: []const u8) !ArgumentInterpretation {
         }
 
         if (std.mem.indexOfScalar(u8, name, '=')) |ix| {
-            if (name.len < ix + 2) return error.MissingOptionArgument;
+            if (name.len < ix + 2) return error.MissingOptionValue;
             return ArgumentInterpretation{ .option = OptionInterpretation{
                 .option_type = option_type,
                 .name = name[0..ix],
@@ -103,6 +103,6 @@ test "missing option value" {
     if (interpret("--abc=")) |_| {
         try expect(false);
     } else |err| {
-        try expect(err == error.MissingOptionArgument);
+        try expect(err == error.MissingOptionValue);
     }
 }

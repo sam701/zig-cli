@@ -1,6 +1,9 @@
 const std = @import("std");
 
-pub const ValueParser = *const fn (dest: *anyopaque, value: []const u8) anyerror!void;
+pub const ValueParseError = error{
+    InvalidValue,
+};
+pub const ValueParser = *const fn (dest: *anyopaque, value: []const u8) ValueParseError!void;
 
 pub const ValueData = struct {
     value_size: usize,
@@ -32,9 +35,9 @@ fn intData(comptime ValueType: type, comptime DestinationType: type) ValueData {
     return .{
         .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
-            fn parser(dest: *anyopaque, value: []const u8) anyerror!void {
+            fn parser(dest: *anyopaque, value: []const u8) ValueParseError!void {
                 const dt: *DestinationType = @alignCast(@ptrCast(dest));
-                dt.* = try std.fmt.parseInt(ValueType, value, 10);
+                dt.* = std.fmt.parseInt(ValueType, value, 10) catch return error.InvalidValue;
             }
         }.parser,
         .type_name = "integer",
@@ -45,9 +48,9 @@ fn floatData(comptime ValueType: type, comptime DestinationType: type) ValueData
     return .{
         .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
-            fn parser(dest: *anyopaque, value: []const u8) anyerror!void {
+            fn parser(dest: *anyopaque, value: []const u8) ValueParseError!void {
                 const dt: *DestinationType = @ptrCast(@alignCast(dest));
-                dt.* = try std.fmt.parseFloat(ValueType, value);
+                dt.* = std.fmt.parseFloat(ValueType, value) catch return error.InvalidValue;
             }
         }.parser,
         .type_name = "float",
@@ -62,14 +65,14 @@ fn boolData(comptime DestinationType: type) ValueData {
         .value_size = @sizeOf(DestinationType),
         .is_bool = true,
         .value_parser = struct {
-            fn parser(dest: *anyopaque, value: []const u8) anyerror!void {
+            fn parser(dest: *anyopaque, value: []const u8) ValueParseError!void {
                 const dt: *DestinationType = @ptrCast(@alignCast(dest));
 
                 if (std.mem.eql(u8, value, str_true)) {
                     dt.* = true;
                 } else if (std.mem.eql(u8, value, str_false)) {
                     dt.* = false;
-                } else return error.ParseBoolError;
+                } else return error.InvalidValue;
             }
         }.parser,
         .type_name = "bool",
@@ -80,7 +83,7 @@ fn stringData(comptime DestinationType: type) ValueData {
     return .{
         .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
-            fn parser(dest: *anyopaque, value: []const u8) anyerror!void {
+            fn parser(dest: *anyopaque, value: []const u8) ValueParseError!void {
                 const dt: *DestinationType = @ptrCast(@alignCast(dest));
                 dt.* = value;
             }
@@ -94,7 +97,7 @@ fn enumData(comptime ValueType: type, comptime DestinationType: type) ValueData 
     return .{
         .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
-            fn parser(dest: *anyopaque, value: []const u8) anyerror!void {
+            fn parser(dest: *anyopaque, value: []const u8) ValueParseError!void {
                 inline for (edata.fields) |field| {
                     if (std.mem.eql(u8, field.name, value)) {
                         const dt: *DestinationType = @ptrCast(@alignCast(dest));
@@ -102,7 +105,7 @@ fn enumData(comptime ValueType: type, comptime DestinationType: type) ValueData 
                         return;
                     }
                 }
-                return error.InvalidEnumValue;
+                return error.InvalidValue;
             }
         }.parser,
         .type_name = "enum",

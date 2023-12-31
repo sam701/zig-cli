@@ -10,8 +10,9 @@ pub const ValueRef = struct {
     element_count: usize = 0,
 
     const Self = @This();
+    pub const RefError = Allocator.Error || vp.ValueParseError;
 
-    pub fn put(self: *Self, value: []const u8, alloc: Allocator) anyerror!void {
+    pub fn put(self: *Self, value: []const u8, alloc: Allocator) RefError!void {
         self.element_count += 1;
         switch (self.value_type) {
             .single => {
@@ -27,7 +28,7 @@ pub const ValueRef = struct {
         }
     }
 
-    pub fn finalize(self: *Self, alloc: Allocator) anyerror!void {
+    pub fn finalize(self: *Self, alloc: Allocator) RefError!void {
         switch (self.value_type) {
             .single => {},
             .multi => |*list| {
@@ -94,24 +95,24 @@ const ValueList = struct {
     vtable: VTable,
 
     const VTable = struct {
-        createList: *const fn (Allocator) anyerror!*anyopaque,
-        addOne: *const fn (list_ptr: *anyopaque, alloc: Allocator) anyerror!*anyopaque,
-        finalize: *const fn (list_ptr: *anyopaque, dest: *anyopaque, alloc: Allocator) anyerror!void,
+        createList: *const fn (Allocator) Allocator.Error!*anyopaque,
+        addOne: *const fn (list_ptr: *anyopaque, alloc: Allocator) Allocator.Error!*anyopaque,
+        finalize: *const fn (list_ptr: *anyopaque, dest: *anyopaque, alloc: Allocator) Allocator.Error!void,
     };
 
     fn init(comptime T: type) ValueList {
         const List = std.ArrayListUnmanaged(T);
         const gen = struct {
-            fn createList(alloc: Allocator) anyerror!*anyopaque {
+            fn createList(alloc: Allocator) Allocator.Error!*anyopaque {
                 const list = try alloc.create(List);
                 list.* = List{};
                 return list;
             }
-            fn addOne(list_ptr: *anyopaque, alloc: Allocator) anyerror!*anyopaque {
+            fn addOne(list_ptr: *anyopaque, alloc: Allocator) Allocator.Error!*anyopaque {
                 const list: *List = @alignCast(@ptrCast(list_ptr));
                 return @ptrCast(try list.addOne(alloc));
             }
-            fn finalize(list_ptr: *anyopaque, dest: *anyopaque, alloc: Allocator) anyerror!void {
+            fn finalize(list_ptr: *anyopaque, dest: *anyopaque, alloc: Allocator) Allocator.Error!void {
                 const list: *List = @alignCast(@ptrCast(list_ptr));
                 const destSlice: *[]T = @alignCast(@ptrCast(dest));
                 destSlice.* = try list.toOwnedSlice(alloc);

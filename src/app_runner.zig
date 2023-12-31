@@ -4,7 +4,9 @@ const ArenaAllocator = std.heap.ArenaAllocator;
 const value_ref = @import("value_ref.zig");
 const ValueRef = value_ref.ValueRef;
 const App = @import("command.zig").App;
-const Parser = @import("parser.zig").Parser;
+const parser = @import("parser.zig");
+const Parser = parser.Parser;
+const Printer = @import("Printer.zig");
 
 pub const AppRunner = struct {
     // This arena and its allocator is intended to be used only for the value references
@@ -38,8 +40,46 @@ pub const AppRunner = struct {
         var cr = try Parser(std.process.ArgIterator).init(app, iter, self.arena.child_allocator);
         defer cr.deinit();
 
-        const action = try cr.parse();
-        self.deinit();
-        return action();
+        if (cr.parse()) |action| {
+            self.deinit();
+            return action();
+        } else |err| {
+            processError(err, cr.error_data orelse unreachable, app);
+        }
     }
 };
+
+fn processError(err: parser.ParseError, err_data: parser.ErrorData, app: *const App) void {
+    switch (err) {
+        error.UnknownOption => printError(app, "unknown option '--{s}'", .{err_data.provided_string}),
+        error.UnknownOptionAlias => printError(app, "unknown option alias '-{c}'", .{err_data.option_alias}),
+        error.UnknownSubcommand => printError(app, "unknown subcommand '{s}'", .{err_data.provided_string}),
+        error.MissingRequiredOption => printError(app, "missing required option '--{s}'", .{err_data.entity_name}),
+        error.MissingRequiredPositionalArgument => printError(app, "missing required positional argument '{s}'", .{err_data.entity_name}),
+        error.MissingSubcommand => printError(app, "command '{s}' requires subcommand", .{err_data.entity_name}),
+        error.MissingOptionValue => printError(app, "option ('--{s}') requires value", .{err_data.entity_name}),
+        error.UnexpectedPositionalArgument => printError(app, "unexpected positional argument '{s}'", .{err_data.provided_string}),
+        error.CommandDoesNotHavePositionalArguments => printError(app, "command '{s}' does not have positional arguments", .{err_data.entity_name}),
+        error.InvalidValue => {
+            const iv = err_data.invalid_value;
+            const et = if (iv.entity_type == .option) "option" else "positional argument";
+            const px = if (iv.entity_type == .option) "--" else "";
+            if (iv.envvar) |ev| {
+                printError(app, "failed to parse option (--{s}) value '{s}' as {s} read from envvar {s}", .{ iv.entity_name, iv.provided_string, iv.value_type, ev });
+            } else {
+                printError(app, "failed to parse {s} ({s}{s}) provided value '{s}' as {s}", .{ et, px, iv.entity_name, iv.provided_string, iv.value_type });
+            }
+        },
+        error.OutOfMemory => printError(app, "out of memory", .{}),
+    }
+}
+
+fn printError(app: *const App, comptime fmt: []const u8, args: anytype) void {
+    var p = Printer.init(std.io.getStdErr(), app.help_config.color_usage);
+
+    p.printInColor(app.help_config.color_error, "ERROR");
+    p.format(": ", .{});
+    p.format(fmt, args);
+    p.write(&.{'\n'});
+    std.os.exit(1);
+}
