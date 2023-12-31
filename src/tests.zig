@@ -9,6 +9,7 @@ const AppRunner = @import("app_runner.zig").AppRunner;
 
 const expect = std.testing.expect;
 const alloc = std.testing.allocator;
+const expectError = std.testing.expectError;
 
 const StringSliceIterator = struct {
     items: []const []const u8,
@@ -30,13 +31,13 @@ fn runner() *AppRunner {
 }
 
 fn run(app: *const command.App, items: []const []const u8) !void {
-    const it = StringSliceIterator{
-        .items = items,
-    };
-
-    var parser = try Parser(StringSliceIterator).init(app, it, alloc);
+    var parser = try Parser(StringSliceIterator).init(
+        app,
+        StringSliceIterator{ .items = items },
+        alloc,
+    );
+    defer parser.deinit();
     _ = try parser.parse();
-    parser.deinit();
 }
 
 fn dummy_action() !void {}
@@ -304,4 +305,131 @@ test "parse enums" {
     try std.testing.expect(aa[1] == Aa.dd);
 
     alloc.free(aa);
+}
+
+test "unknown option" {
+    var r = runner();
+    defer r.deinit();
+    var aa: []const u8 = undefined;
+    const opt = command.Option{
+        .long_name = "aa",
+        .short_alias = 'a',
+        .help = "option aa",
+        .value_ref = r.mkRef(&aa),
+    };
+
+    try expectError(error.UnknownOption, runOptions(&.{ "abc", "--bad", "val" }, &.{opt}));
+
+    try expectError(error.UnknownOptionAlias, runOptions(&.{ "abc", "-b", "val" }, &.{opt}));
+}
+
+test "unknown subcommand" {
+    var r = runner();
+    defer r.deinit();
+
+    const app = command.App{
+        .command = command.Command{
+            .name = "abc",
+            .target = command.CommandTarget{
+                .subcommands = &.{},
+            },
+        },
+    };
+
+    try expectError(error.UnknownSubcommand, run(&app, &.{ "abc", "bad" }));
+}
+
+test "missing subcommand" {
+    var r = runner();
+    defer r.deinit();
+
+    const app = command.App{
+        .command = command.Command{
+            .name = "abc",
+            .target = command.CommandTarget{
+                .subcommands = &.{},
+            },
+        },
+    };
+
+    try expectError(error.MissingSubcommand, run(&app, &.{"abc"}));
+    try expectError(error.CommandDoesNotHavePositionalArguments, run(&app, &.{ "abc", "--", "3" }));
+}
+
+test "missing required option" {
+    var r = runner();
+    defer r.deinit();
+    var aa: []const u8 = undefined;
+    const opt = command.Option{
+        .long_name = "aa",
+        .short_alias = 'a',
+        .required = true,
+        .help = "option aa",
+        .value_ref = r.mkRef(&aa),
+    };
+
+    try expectError(error.MissingRequiredOption, runOptions(&.{"abc"}, &.{opt}));
+    try expectError(error.MissingOptionValue, runOptions(&.{ "abc", "--aa" }, &.{opt}));
+}
+
+test "missing positional argument" {
+    var r = runner();
+    defer r.deinit();
+
+    var x: usize = 0;
+
+    const app = command.App{
+        .command = command.Command{
+            .name = "abc",
+            .target = command.CommandTarget{
+                .action = command.CommandAction{
+                    .positional_args = command.PositionalArgs{
+                        .required = &.{
+                            command.PositionalArg{
+                                .name = "PA1",
+                                .value_ref = r.mkRef(&x),
+                            },
+                        },
+                    },
+                    .exec = dummy_action,
+                },
+            },
+        },
+    };
+
+    try expectError(error.MissingRequiredPositionalArgument, run(&app, &.{"abc"}));
+    try expectError(error.UnexpectedPositionalArgument, run(&app, &.{ "abc", "3", "4" }));
+}
+
+test "command without positional arguments" {
+    var r = runner();
+    defer r.deinit();
+
+    const app = command.App{
+        .command = command.Command{
+            .name = "abc",
+            .target = command.CommandTarget{
+                .action = command.CommandAction{
+                    .exec = dummy_action,
+                },
+            },
+        },
+    };
+
+    try expectError(error.CommandDoesNotHavePositionalArguments, run(&app, &.{ "abc", "3", "abc" }));
+}
+
+test "invalid value" {
+    var r = runner();
+    defer r.deinit();
+    var aa: usize = undefined;
+    const opt = command.Option{
+        .long_name = "aa",
+        .short_alias = 'a',
+        .required = true,
+        .help = "option aa",
+        .value_ref = r.mkRef(&aa),
+    };
+
+    try expectError(error.InvalidValue, runOptions(&.{ "abc", "--aa", "bad" }, &.{opt}));
 }

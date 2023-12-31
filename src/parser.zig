@@ -169,6 +169,9 @@ pub fn Parser(comptime Iterator: type) type {
                         if (posArgRef.value_type == vref.ValueType.single) {
                             self.position_argument_ix += 1;
                         }
+                    } else {
+                        self.error_data = ErrorData{ .entity_name = cmd.name };
+                        return error.CommandDoesNotHavePositionalArguments;
                     }
                 },
             }

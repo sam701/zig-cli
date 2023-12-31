@@ -105,8 +105,10 @@ const HelpPrinter = struct {
                     while (it.next()) |parg| {
                         self.printer.write("  ");
                         self.printer.printInColor(self.help_config.color_option, parg.name);
-                        self.printer.printSpaces(max_arg_width - parg.name.len + 3);
-                        self.printer.write(parg.help);
+                        if (parg.help) |help| {
+                            self.printer.printSpaces(max_arg_width - parg.name.len + 3);
+                            self.printer.write(help);
+                        }
                         self.printer.printNewLine();
                     }
                 }
