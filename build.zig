@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
 
     const module = b.addModule("zig-cli", .{
-        .source_file = std.Build.FileSource.relative("src/main.zig"),
+        .root_source_file = std.Build.LazyPath.relative("src/main.zig"),
     });
 
     const lib = b.addStaticLibrary(.{
@@ -26,19 +26,21 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_tests.step);
 
     const simple = b.addExecutable(.{
+        .target = target,
         .name = "simple",
         .root_source_file = .{ .path = "examples/simple.zig" },
         .optimize = optimize,
     });
-    simple.addModule("zig-cli", module);
+    simple.root_module.addImport("zig-cli", module);
     b.installArtifact(simple);
 
     const short = b.addExecutable(.{
+        .target = target,
         .name = "short",
         .root_source_file = .{ .path = "examples/short.zig" },
         .optimize = optimize,
     });
-    short.addModule("zig-cli", module);
+    short.root_module.addImport("zig-cli", module);
     b.installArtifact(short);
 
     b.default_step.dependOn(&simple.step);
