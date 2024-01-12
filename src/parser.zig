@@ -45,7 +45,7 @@ pub fn Parser(comptime Iterator: type) type {
         next_arg: ?[]const u8 = null,
 
         pub fn init(app: *const command.App, it: Iterator, alloc: Allocator) !Self {
-            return Self{
+            return .{
                 .alloc = alloc,
                 .arg_iterator = it,
                 .app = app,
@@ -143,7 +143,7 @@ pub fn Parser(comptime Iterator: type) type {
                             self.fail("positional argument ({s}): cannot parse '{s}' as {s}: {s}", .{ posArg.name, arg, posArgRef.value_data.type_name, @errorName(err) });
                             unreachable;
                         };
-                        if (posArgRef.value_type == vref.ValueType.single) {
+                        if (posArgRef.value_type == .single) {
                             self.position_argument_ix += 1;
                         }
                     }
@@ -171,17 +171,16 @@ pub fn Parser(comptime Iterator: type) type {
                 defer self.alloc.free(envvar_name);
                 @memcpy(envvar_name[0..prefix.len], prefix);
                 for (envvar_name[prefix.len..], opt.long_name) |*dest, name_char| {
-                    if (name_char == '-') {
-                        dest.* = '_';
-                    } else {
-                        dest.* = std.ascii.toUpper(name_char);
-                    }
+                    dest.* = if (name_char == '-') '_' else std.ascii.toUpper(name_char);
                 }
 
                 if (std.process.getEnvVarOwned(self.alloc, envvar_name)) |value| {
                     defer self.alloc.free(value);
                     opt.value_ref.put(value, self.alloc) catch |err| {
-                        self.fail("envvar({s}): cannot parse {s} value '{s}': {s}", .{ envvar_name, opt.value_ref.value_data.type_name, value, @errorName(err) });
+                        self.fail(
+                            "envvar({s}): cannot parse {s} value '{s}': {s}",
+                            .{ envvar_name, opt.value_ref.value_data.type_name, value, @errorName(err) },
+                        );
                         unreachable;
                     };
                 } else |err| {
@@ -196,12 +195,9 @@ pub fn Parser(comptime Iterator: type) type {
             var args_only = false;
             try switch (int.*) {
                 .option => |opt| self.process_option(&opt),
-                .double_dash => {
-                    args_only = true;
-                },
+                .double_dash => args_only = true,
                 .other => |some_name| {
-                    const cmd = self.current_command();
-                    switch (cmd.target) {
+                    switch (self.current_command().target) {
                         .subcommands => |cmds| {
                             for (cmds) |sc| {
                                 if (std.mem.eql(u8, sc.name, some_name)) {
@@ -211,9 +207,7 @@ pub fn Parser(comptime Iterator: type) type {
                             }
                             self.fail("no such subcommand '{s}'", .{some_name});
                         },
-                        .action => {
-                            try self.handlePositionalArgument(some_name);
-                        },
+                        .action => try self.handlePositionalArgument(some_name),
                     }
                 },
             };
@@ -237,8 +231,15 @@ pub fn Parser(comptime Iterator: type) type {
             var opt: *command.Option = switch (option_interpretation.option_type) {
                 .long => self.find_option_by_name(option_interpretation.name),
                 .short => a: {
-                    self.set_concatenated_boolean_options(self.current_command(), option_interpretation.name[0 .. option_interpretation.name.len - 1]);
-                    break :a self.find_option_by_alias(self.current_command(), option_interpretation.name[option_interpretation.name.len - 1]);
+                    const active_command = self.current_command();
+                    self.set_concatenated_boolean_options(
+                        active_command,
+                        option_interpretation.name[0 .. option_interpretation.name.len - 1],
+                    );
+                    break :a self.find_option_by_alias(
+                        active_command,
+                        option_interpretation.name[option_interpretation.name.len - 1],
+                    );
                 },
             };
 
@@ -257,8 +258,7 @@ pub fn Parser(comptime Iterator: type) type {
                     return;
                 }
 
-                const following_arg = self.nextArg();
-                if (following_arg) |arg| {
+                if (self.nextArg()) |arg| {
                     if (arg.len > 0 and arg[0] != '-') {
                         var lw = try self.alloc.alloc(u8, arg.len);
                         defer self.alloc.free(lw);
@@ -278,7 +278,14 @@ pub fn Parser(comptime Iterator: type) type {
                     unreachable;
                 };
                 opt.value_ref.put(arg, self.alloc) catch |err| {
-                    self.fail("option({s}): cannot parse {s} value: {s}", .{ opt.long_name, opt.value_ref.value_data.type_name, @errorName(err) });
+                    self.fail(
+                        "option({s}): cannot parse {s} value: {s}",
+                        .{
+                            opt.long_name,
+                            opt.value_ref.value_data.type_name,
+                            @errorName(err),
+                        },
+                    );
                     unreachable;
                 };
             }
