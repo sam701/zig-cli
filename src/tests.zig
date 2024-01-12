@@ -16,21 +16,16 @@ const StringSliceIterator = struct {
 
     pub fn next(self: *StringSliceIterator) ?[]const u8 {
         defer self.index += 1;
-
-        if (self.index < self.items.len) {
-            return self.items[self.index];
-        } else {
-            return null;
-        }
+        return if (self.index < self.items.len) self.items[self.index] else null;
     }
 };
 
 fn run(app: *const command.App, items: []const []const u8) !void {
-    const it = StringSliceIterator{
-        .items = items,
-    };
-
-    var parser = try Parser(StringSliceIterator).init(app, it, alloc);
+    var parser = try Parser(StringSliceIterator).init(
+        app,
+        .{ .items = items },
+        alloc,
+    );
     _ = try parser.parse();
     parser.deinit();
 }
@@ -38,21 +33,22 @@ fn run(app: *const command.App, items: []const []const u8) !void {
 fn dummy_action() !void {}
 
 fn runOptionsPArgs(input: []const []const u8, options: []const *command.Option, pargs: ?[]const *command.PositionalArg) !void {
-    const pa = if (pargs) |p| command.PositionalArgs{ .args = p } else null;
-    const app = command.App{
-        .command = command.Command{
-            .name = "cmd",
-            .description = command.Description{ .one_line = "short help" },
-            .options = options,
-            .target = command.CommandTarget{
-                .action = command.CommandAction{
-                    .positional_args = pa,
-                    .exec = dummy_action,
+    try run(
+        &.{
+            .command = .{
+                .name = "cmd",
+                .description = .{ .one_line = "short help" },
+                .options = options,
+                .target = .{
+                    .action = .{
+                        .positional_args = if (pargs) |p| .{ .args = p } else null,
+                        .exec = dummy_action,
+                    },
                 },
             },
         },
-    };
-    try run(&app, input);
+        input,
+    );
 }
 
 fn runOptions(input: []const []const u8, options: []const *command.Option) !void {
