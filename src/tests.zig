@@ -17,12 +17,7 @@ const StringSliceIterator = struct {
 
     pub fn next(self: *StringSliceIterator) ?[]const u8 {
         defer self.index += 1;
-
-        if (self.index < self.items.len) {
-            return self.items[self.index];
-        } else {
-            return null;
-        }
+        return if (self.index < self.items.len) self.items[self.index] else null;
     }
 };
 
@@ -45,7 +40,7 @@ fn dummy_action() !void {}
 fn runOptionsPArgs(input: []const []const u8, options: []const command.Option, pargs: ?[]const command.PositionalArg) !void {
     const pa = if (pargs) |p| command.PositionalArgs{ .required = p } else null;
     const app = command.App{
-        .command = command.Command{
+        .command = .{
             .name = "cmd",
             .description = command.Description{ .one_line = "short help" },
             .options = options,

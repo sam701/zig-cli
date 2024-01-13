@@ -64,13 +64,13 @@ pub fn mkRef(dest: anytype) ValueRef {
             switch (pinfo.size) {
                 .Slice => {
                     if (pinfo.child == u8) {
-                        return ValueRef{
+                        return .{
                             .dest = @ptrCast(dest),
                             .value_data = vp.getValueData(t),
                             .value_type = .single,
                         };
                     } else {
-                        return ValueRef{
+                        return .{
                             .dest = @ptrCast(dest),
                             .value_data = vp.getValueData(pinfo.child),
                             .value_type = ValueType{ .multi = ValueList.init(pinfo.child) },
@@ -81,7 +81,7 @@ pub fn mkRef(dest: anytype) ValueRef {
             }
         },
         else => {
-            return ValueRef{
+            return .{
                 .dest = dest,
                 .value_data = vp.getValueData(t),
                 .value_type = .single,
@@ -119,10 +119,12 @@ const ValueList = struct {
                 alloc.destroy(list);
             }
         };
-        return ValueList{ .vtable = VTable{
-            .createList = gen.createList,
-            .addOne = gen.addOne,
-            .finalize = gen.finalize,
-        } };
+        return .{
+            .vtable = .{
+                .createList = gen.createList,
+                .addOne = gen.addOne,
+                .finalize = gen.finalize,
+            },
+        };
     }
 };

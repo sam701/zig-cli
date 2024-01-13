@@ -18,34 +18,38 @@ pub const ArgumentInterpretation = union(enum) {
 };
 
 pub fn interpret(arg: []const u8) error{MissingOptionValue}!ArgumentInterpretation {
-    if (arg.len == 0) return ArgumentInterpretation{ .other = arg };
+    if (arg.len == 0) return .{ .other = arg };
 
     if (arg[0] == '-') {
-        if (arg.len == 1) return ArgumentInterpretation{ .other = arg };
+        if (arg.len == 1) return .{ .other = arg };
 
         var name = arg[1..];
-        var option_type = OptionType.short;
+        var option_type: OptionType = .short;
         if (arg[1] == '-') {
-            if (arg.len == 2) return ArgumentInterpretation.double_dash;
+            if (arg.len == 2) return .double_dash;
             name = arg[2..];
             option_type = .long;
         }
 
         if (std.mem.indexOfScalar(u8, name, '=')) |ix| {
             if (name.len < ix + 2) return error.MissingOptionValue;
-            return ArgumentInterpretation{ .option = OptionInterpretation{
-                .option_type = option_type,
-                .name = name[0..ix],
-                .value = name[ix + 1 ..],
-            } };
+            return .{
+                .option = .{
+                    .option_type = option_type,
+                    .name = name[0..ix],
+                    .value = name[ix + 1 ..],
+                },
+            };
         } else {
-            return ArgumentInterpretation{ .option = OptionInterpretation{
-                .option_type = option_type,
-                .name = name,
-            } };
+            return .{
+                .option = .{
+                    .option_type = option_type,
+                    .name = name,
+                },
+            };
         }
     } else {
-        return ArgumentInterpretation{ .other = arg };
+        return .{ .other = arg };
     }
 }
 

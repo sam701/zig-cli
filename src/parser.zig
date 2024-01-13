@@ -58,7 +58,7 @@ pub fn Parser(comptime Iterator: type) type {
         error_data: ?ErrorData = null,
 
         pub fn init(app: *const command.App, it: Iterator, alloc: Allocator) !Self {
-            return Self{
+            return .{
                 .alloc = alloc,
                 .arg_iterator = it,
                 .app = app,
@@ -166,7 +166,7 @@ pub fn Parser(comptime Iterator: type) type {
                             };
                             return err;
                         };
-                        if (posArgRef.value_type == vref.ValueType.single) {
+                        if (posArgRef.value_type == .single) {
                             self.position_argument_ix += 1;
                         }
                     } else {
@@ -199,11 +199,7 @@ pub fn Parser(comptime Iterator: type) type {
                 defer self.alloc.free(envvar_name);
                 @memcpy(envvar_name[0..prefix.len], prefix);
                 for (envvar_name[prefix.len..], opt.long_name) |*dest, name_char| {
-                    if (name_char == '-') {
-                        dest.* = '_';
-                    } else {
-                        dest.* = std.ascii.toUpper(name_char);
-                    }
+                    dest.* = if (name_char == '-') '_' else std.ascii.toUpper(name_char);
                 }
 
                 if (std.process.getEnvVarOwned(self.alloc, envvar_name)) |value| {
@@ -226,12 +222,9 @@ pub fn Parser(comptime Iterator: type) type {
             var args_only = false;
             try switch (int.*) {
                 .option => |opt| self.process_option(&opt),
-                .double_dash => {
-                    args_only = true;
-                },
+                .double_dash => args_only = true,
                 .other => |some_name| {
-                    const cmd = self.current_command();
-                    switch (cmd.target) {
+                    switch (self.current_command().target) {
                         .subcommands => |cmds| {
                             for (cmds) |*sc| {
                                 if (std.mem.eql(u8, sc.name, some_name)) {
@@ -242,9 +235,7 @@ pub fn Parser(comptime Iterator: type) type {
                             self.error_data = ErrorData{ .provided_string = some_name };
                             return error.UnknownSubcommand;
                         },
-                        .action => {
-                            try self.handlePositionalArgument(some_name);
-                        },
+                        .action => try self.handlePositionalArgument(some_name),
                     }
                 },
             };
@@ -268,8 +259,14 @@ pub fn Parser(comptime Iterator: type) type {
             var opt: *const command.Option = switch (option_interpretation.option_type) {
                 .long => try self.find_option_by_name(option_interpretation.name),
                 .short => a: {
-                    try self.set_concatenated_boolean_options(self.current_command(), option_interpretation.name[0 .. option_interpretation.name.len - 1]);
-                    break :a try self.find_option_by_alias(self.current_command(), option_interpretation.name[option_interpretation.name.len - 1]);
+                    try self.set_concatenated_boolean_options(
+                        self.current_command(),
+                        option_interpretation.name[0 .. option_interpretation.name.len - 1],
+                    );
+                    break :a try self.find_option_by_alias(
+                        self.current_command(),
+                        option_interpretation.name[option_interpretation.name.len - 1],
+                    );
                 },
             };
 
@@ -288,8 +285,7 @@ pub fn Parser(comptime Iterator: type) type {
                     return;
                 }
 
-                const following_arg = self.nextArg();
-                if (following_arg) |arg| {
+                if (self.nextArg()) |arg| {
                     if (arg.len > 0 and arg[0] != '-') {
                         var lw = try self.alloc.alloc(u8, arg.len);
                         defer self.alloc.free(lw);
