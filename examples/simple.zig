@@ -13,6 +13,36 @@ var config = struct {
     arg2: []const []const u8 = undefined,
 }{};
 
+fn sub3(r: *cli.AppRunner) !cli.Command {
+    return cli.Command{
+        .name = "sub3",
+        .description = cli.Description{
+            .one_line = "sub3 with positional arguments",
+        },
+        .target = cli.CommandTarget{
+            .action = cli.CommandAction{
+                .positional_args = cli.PositionalArgs{
+                    .required = try r.mkSlice(cli.PositionalArg, &.{
+                        .{
+                            .name = "ARG1",
+                            .help = "arg1 help",
+                            .value_ref = r.mkRef(&config.arg1),
+                        },
+                    }),
+                    .optional = try r.mkSlice(cli.PositionalArg, &.{
+                        .{
+                            .name = "ARG2",
+                            .help = "multiple arg2 help",
+                            .value_ref = r.mkRef(&config.arg2),
+                        },
+                    }),
+                },
+                .exec = run_sub3,
+            },
+        },
+    };
+}
+
 pub fn main() anyerror!void {
     var r = try cli.AppRunner.init(std.heap.page_allocator);
 
@@ -25,33 +55,6 @@ pub fn main() anyerror!void {
         },
     };
 
-    const sub3 = cli.Command{
-        .name = "sub3",
-        .description = cli.Description{
-            .one_line = "sub3 with positional arguments",
-        },
-        .target = cli.CommandTarget{
-            .action = cli.CommandAction{
-                .positional_args = cli.PositionalArgs{
-                    .required = &.{
-                        cli.PositionalArg{
-                            .name = "ARG1",
-                            .help = "arg1 help",
-                            .value_ref = r.mkRef(&config.arg1),
-                        },
-                    },
-                    .optional = &.{
-                        cli.PositionalArg{
-                            .name = "ARG2",
-                            .help = "multiple arg2 help",
-                            .value_ref = r.mkRef(&config.arg2),
-                        },
-                    },
-                },
-                .exec = run_sub3,
-            },
-        },
-    };
     const app = cli.App{
         .command = cli.Command{
             .name = "simple",
@@ -97,7 +100,7 @@ pub fn main() anyerror!void {
                             },
                         },
                         .target = cli.CommandTarget{
-                            .subcommands = &.{ sub2, sub3 },
+                            .subcommands = &.{ sub2, try sub3(r) },
                         },
                     },
                 },
@@ -106,10 +109,12 @@ pub fn main() anyerror!void {
         .version = "0.10.3",
         .author = "sam701 & contributors",
     };
-    return r.run(&app);
+    // return r.run(&app);
+    const action = try r.parse(&app);
+    return action();
 }
 
-fn run_sub3() anyerror!void {
+fn run_sub3() !void {
     const c = &config;
     std.log.debug("sub3: arg1: {}", .{c.arg1});
     for (c.arg2) |arg| {
@@ -117,7 +122,7 @@ fn run_sub3() anyerror!void {
     }
 }
 
-fn run_sub2() anyerror!void {
+fn run_sub2() !void {
     const c = &config;
     std.log.debug("running sub2: ip={s}, bool={any}, float={any}", .{ c.ip, c.bool, c.float });
 }

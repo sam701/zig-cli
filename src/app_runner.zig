@@ -7,6 +7,7 @@ const App = @import("command.zig").App;
 const parser = @import("parser.zig");
 const Parser = parser.Parser;
 const Printer = @import("Printer.zig");
+const command = @import("command.zig");
 
 pub const AppRunner = struct {
     // This arena and its allocator is intended to be used only for the value references
@@ -33,7 +34,31 @@ pub const AppRunner = struct {
         return value_ref.allocRef(dest, self.alloc);
     }
 
-    pub fn run(self: *Self, app: *const App) anyerror!void {
+    pub fn mkSlice(self: *Self, comptime T: type, content: []const T) ![]T {
+        const dest = try self.alloc.alloc(T, content.len);
+        std.mem.copyForwards(T, dest, content);
+        return dest;
+    }
+
+    pub const ArgumentError = error.ArgumentError;
+    const Error = Allocator.Error || error{ArgumentError};
+    pub fn parse(self: *Self, app: *const App) Error!command.ExecFn {
+        const iter = try std.process.argsWithAllocator(self.alloc);
+
+        // Here we pass the child allocator because any values allocated on the client behalf may not be freed.
+        var cr = try Parser(std.process.ArgIterator).init(app, iter, self.arena.child_allocator);
+        defer cr.deinit();
+
+        if (cr.parse()) |action| {
+            self.deinit();
+            return action;
+        } else |err| {
+            processError(err, cr.error_data orelse unreachable, app);
+            return ArgumentError;
+        }
+    }
+
+    pub fn run(self: *Self, app: *const App) !void {
         const iter = try std.process.argsWithAllocator(self.alloc);
 
         // Here we pass the child allocator because any values allocated on the client behalf may not be freed.
