@@ -245,7 +245,7 @@ pub fn Parser(comptime Iterator: type) type {
 
             if (opt == &help_option) {
                 try help.print_command_help(self.app, try self.command_path.toOwnedSlice());
-                std.os.exit(0);
+                std.posix.exit(0);
             }
 
             if (opt.value_ref.value_data.is_bool) {
@@ -298,7 +298,7 @@ pub fn Parser(comptime Iterator: type) type {
             p.format(": ", .{});
             p.format(fmt, args);
             p.write(&.{'\n'});
-            std.os.exit(1);
+            std.posix.exit(1);
         }
 
         fn find_option_by_name(self: *const Self, option_name: []const u8) *command.Option {
