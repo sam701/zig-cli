@@ -14,7 +14,7 @@ pub fn init(file: std.fs.File, color: command.ColorUsage) Self {
         .use_color = switch (color) {
             .always => true,
             .never => false,
-            .auto => std.os.isatty(file.handle),
+            .auto => std.posix.isatty(file.handle),
         },
     };
 }

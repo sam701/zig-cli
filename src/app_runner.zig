@@ -106,5 +106,5 @@ fn printError(app: *const App, comptime fmt: []const u8, args: anytype) void {
     p.format(": ", .{});
     p.format(fmt, args);
     p.write(&.{'\n'});
-    std.os.exit(1);
+    std.posix.exit(1);
 }

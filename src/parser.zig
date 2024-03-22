@@ -272,7 +272,7 @@ pub fn Parser(comptime Iterator: type) type {
 
             if (opt == self.global_options.option_show_help) {
                 try help.print_command_help(self.app, try self.command_path.toOwnedSlice(), self.global_options);
-                std.os.exit(0);
+                std.posix.exit(0);
             }
 
             if (opt.value_ref.value_data.is_bool) {
