@@ -5,19 +5,19 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
 
     const module = b.addModule("zig-cli", .{
-        .root_source_file = std.Build.LazyPath.relative("src/main.zig"),
+        .root_source_file = b.path("src/main.zig"),
     });
 
     const lib = b.addStaticLibrary(.{
         .name = "zig-cli",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
     b.installArtifact(lib);
 
     const main_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/tests.zig" },
+        .root_source_file = b.path("src/tests.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -28,7 +28,7 @@ pub fn build(b: *std.Build) void {
     const simple = b.addExecutable(.{
         .target = target,
         .name = "simple",
-        .root_source_file = .{ .path = "examples/simple.zig" },
+        .root_source_file = b.path("examples/simple.zig"),
         .optimize = optimize,
     });
     simple.root_module.addImport("zig-cli", module);
@@ -37,7 +37,7 @@ pub fn build(b: *std.Build) void {
     const short = b.addExecutable(.{
         .target = target,
         .name = "short",
-        .root_source_file = .{ .path = "examples/short.zig" },
+        .root_source_file = b.path("examples/short.zig"),
         .optimize = optimize,
     });
     short.root_module.addImport("zig-cli", module);
