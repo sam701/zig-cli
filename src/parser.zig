@@ -79,6 +79,8 @@ pub fn Parser(comptime Iterator: type) type {
         pub fn parse(self: *Self) ParseError!ParseResult {
             try self.command_path.append(&self.app.command);
 
+            // TODO: run all options once before the main run to check if --help is present
+
             _ = self.nextArg();
             var args_only = false;
             while (self.nextArg()) |arg| {
@@ -196,6 +198,7 @@ pub fn Parser(comptime Iterator: type) type {
                 } else |_| {}
             } else if (self.app.option_envvar_prefix) |prefix| {
                 var envvar_name = try self.alloc.alloc(u8, opt.long_name.len + prefix.len);
+                // FIXME: envvar_name must not be freed in case of errors
                 defer self.alloc.free(envvar_name);
                 @memcpy(envvar_name[0..prefix.len], prefix);
                 for (envvar_name[prefix.len..], opt.long_name) |*dest, name_char| {

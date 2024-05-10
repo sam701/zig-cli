@@ -43,7 +43,7 @@ fn sub3(r: *cli.AppRunner) !cli.Command {
     };
 }
 
-pub fn main() anyerror!void {
+fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
     var r = try cli.AppRunner.init(std.heap.page_allocator);
 
     const sub2 = cli.Command{
@@ -109,8 +109,12 @@ pub fn main() anyerror!void {
         .version = "0.10.3",
         .author = "sam701 & contributors",
     };
-    // return r.run(&app);
-    const action = try r.parse(&app);
+
+    return r.parse(&app);
+}
+
+pub fn main() anyerror!void {
+    const action = try parseArgs();
     return action();
 }
 
