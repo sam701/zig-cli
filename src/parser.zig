@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
 
 const command = @import("command.zig");
 const help = @import("./help.zig");
@@ -48,7 +49,8 @@ pub fn Parser(comptime Iterator: type) type {
     return struct {
         const Self = @This();
 
-        alloc: Allocator,
+        orig_allocator: Allocator,
+        arena: ArenaAllocator,
         arg_iterator: Iterator,
         app: *const command.App,
         command_path: std.ArrayList(*const command.Command),
@@ -59,7 +61,8 @@ pub fn Parser(comptime Iterator: type) type {
 
         pub fn init(app: *const command.App, it: Iterator, alloc: Allocator) !Self {
             return .{
-                .alloc = alloc,
+                .orig_allocator = alloc,
+                .arena = ArenaAllocator.init(alloc),
                 .arg_iterator = it,
                 .app = app,
                 .command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16),
@@ -70,6 +73,7 @@ pub fn Parser(comptime Iterator: type) type {
         pub fn deinit(self: *Self) void {
             self.command_path.deinit();
             self.global_options.deinit();
+            self.arena.deinit();
         }
 
         inline fn current_command(self: *const Self) *const command.Command {
@@ -101,7 +105,7 @@ pub fn Parser(comptime Iterator: type) type {
                 if (cmd.options) |options| {
                     for (options) |*opt| {
                         try self.set_option_value_from_envvar(opt);
-                        try opt.value_ref.finalize(self.alloc);
+                        try opt.value_ref.finalize(self.orig_allocator);
 
                         if (opt.required and opt.value_ref.element_count == 0) {
                             self.error_data = ErrorData{ .entity_name = opt.long_name };
@@ -116,7 +120,7 @@ pub fn Parser(comptime Iterator: type) type {
                             var it = argh.iterator();
                             const required_args_no = if (pargs.required) |req| req.len else 0;
                             while (it.next()) |parg| {
-                                try parg.value_ref.finalize(self.alloc);
+                                try parg.value_ref.finalize(self.orig_allocator);
 
                                 if (it.index <= required_args_no and parg.value_ref.element_count == 0) {
                                     self.error_data = ErrorData{ .entity_name = parg.name };
@@ -157,7 +161,7 @@ pub fn Parser(comptime Iterator: type) type {
 
                         const posArg = posH.at(self.position_argument_ix);
                         var posArgRef = posArg.value_ref;
-                        posArgRef.put(arg, self.alloc) catch |err| {
+                        posArgRef.put(arg, self.orig_allocator) catch |err| {
                             self.error_data = ErrorData{
                                 .invalid_value = .{
                                     .entity_type = .positional_argument,
@@ -181,11 +185,11 @@ pub fn Parser(comptime Iterator: type) type {
 
         fn set_option_value_from_envvar(self: *Self, opt: *const command.Option) ParseError!void {
             if (opt.value_ref.element_count > 0) return;
+            const arena_alloc = self.arena.allocator();
 
             if (opt.envvar) |envvar_name| {
-                if (std.process.getEnvVarOwned(self.alloc, envvar_name)) |value| {
-                    defer self.alloc.free(value);
-                    opt.value_ref.put(value, self.alloc) catch |err| {
+                if (std.process.getEnvVarOwned(arena_alloc, envvar_name)) |value| {
+                    opt.value_ref.put(value, self.orig_allocator) catch |err| {
                         self.error_data = ErrorData{ .invalid_value = .{
                             .entity_type = .option,
                             .entity_name = opt.long_name,
@@ -197,17 +201,14 @@ pub fn Parser(comptime Iterator: type) type {
                     };
                 } else |_| {}
             } else if (self.app.option_envvar_prefix) |prefix| {
-                var envvar_name = try self.alloc.alloc(u8, opt.long_name.len + prefix.len);
-                // FIXME: envvar_name must not be freed in case of errors
-                defer self.alloc.free(envvar_name);
+                var envvar_name = try arena_alloc.alloc(u8, opt.long_name.len + prefix.len);
                 @memcpy(envvar_name[0..prefix.len], prefix);
                 for (envvar_name[prefix.len..], opt.long_name) |*dest, name_char| {
                     dest.* = if (name_char == '-') '_' else std.ascii.toUpper(name_char);
                 }
 
-                if (std.process.getEnvVarOwned(self.alloc, envvar_name)) |value| {
-                    defer self.alloc.free(value);
-                    opt.value_ref.put(value, self.alloc) catch |err| {
+                if (std.process.getEnvVarOwned(arena_alloc, envvar_name)) |value| {
+                    opt.value_ref.put(value, self.orig_allocator) catch |err| {
                         self.error_data = ErrorData{ .invalid_value = .{
                             .entity_type = .option,
                             .entity_name = opt.long_name,
@@ -279,35 +280,34 @@ pub fn Parser(comptime Iterator: type) type {
             }
 
             if (opt.value_ref.value_data.is_bool) {
+                const arena_alloc = self.arena.allocator();
                 if (option_interpretation.value) |opt_value| {
-                    var lw = try self.alloc.alloc(u8, opt_value.len);
-                    defer self.alloc.free(lw);
+                    var lw = try arena_alloc.alloc(u8, opt_value.len);
 
                     lw = std.ascii.lowerString(lw, opt_value);
-                    try opt.value_ref.put(lw, self.alloc);
+                    try opt.value_ref.put(lw, self.orig_allocator);
                     return;
                 }
 
                 if (self.nextArg()) |arg| {
                     if (arg.len > 0 and arg[0] != '-') {
-                        var lw = try self.alloc.alloc(u8, arg.len);
-                        defer self.alloc.free(lw);
+                        var lw = try arena_alloc.alloc(u8, arg.len);
 
                         lw = std.ascii.lowerString(lw, arg);
                         if (std.mem.eql(u8, lw, str_true) or std.mem.eql(u8, lw, str_false)) {
-                            try opt.value_ref.put(lw, self.alloc);
+                            try opt.value_ref.put(lw, self.orig_allocator);
                             return;
                         }
                     }
                     self.putArgBack(arg);
                 }
-                try opt.value_ref.put(str_true, self.alloc);
+                try opt.value_ref.put(str_true, self.orig_allocator);
             } else {
                 const arg = option_interpretation.value orelse self.nextArg() orelse {
                     self.error_data = ErrorData{ .entity_name = opt.long_name };
                     return error.MissingOptionValue;
                 };
-                opt.value_ref.put(arg, self.alloc) catch |err| {
+                opt.value_ref.put(arg, self.orig_allocator) catch |err| {
                     self.error_data = ErrorData{ .invalid_value = .{
                         .entity_type = .option,
                         .entity_name = opt.long_name,
@@ -361,7 +361,7 @@ pub fn Parser(comptime Iterator: type) type {
             for (options) |alias| {
                 var opt = try self.find_option_by_alias(cmd, alias);
                 if (opt.value_ref.value_data.is_bool) {
-                    opt.value_ref.put("true", self.alloc) catch unreachable;
+                    opt.value_ref.put(str_true, self.orig_allocator) catch unreachable;
                 } else {
                     return error.MissingOptionValue;
                 }

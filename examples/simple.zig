@@ -100,7 +100,7 @@ fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
                             },
                         },
                         .target = cli.CommandTarget{
-                            .subcommands = &.{ sub2, try sub3(r) },
+                            .subcommands = &.{ sub2, try sub3(&r) },
                         },
                     },
                 },

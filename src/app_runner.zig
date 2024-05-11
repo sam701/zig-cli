@@ -12,18 +12,16 @@ const command = @import("command.zig");
 pub const AppRunner = struct {
     // This arena and its allocator is intended to be used only for the value references
     // that must be freed after the parsing is finished.
-    // For everything else the original allocator, i.e. arena.child_allocator should be used.
+    // For everything else the original allocator.
     arena: ArenaAllocator,
-    alloc: Allocator,
+    orig_allocator: Allocator,
 
     const Self = @This();
-    pub fn init(alloc: Allocator) !*Self {
-        var arena = ArenaAllocator.init(alloc);
-        var sptr = try arena.allocator().create(Self);
-
-        sptr.arena = arena;
-        sptr.alloc = sptr.arena.allocator();
-        return sptr;
+    pub fn init(alloc: Allocator) !Self {
+        return .{
+            .arena = ArenaAllocator.init(alloc),
+            .orig_allocator = alloc,
+        };
     }
 
     pub fn deinit(self: *Self) void {
@@ -31,13 +29,13 @@ pub const AppRunner = struct {
     }
 
     pub fn mkRef(self: *Self, dest: anytype) *ValueRef {
-        return value_ref.allocRef(dest, self.alloc);
+        return value_ref.allocRef(dest, self.arena.allocator());
     }
 
     /// mkSlice allocates a slice and copies the given content into it.
     /// The slice will be freed when the `parse` returns.
     pub fn mkSlice(self: *Self, comptime T: type, content: []const T) ![]T {
-        const dest = try self.alloc.alloc(T, content.len);
+        const dest = try self.arena.allocator().alloc(T, content.len);
         std.mem.copyForwards(T, dest, content);
         return dest;
     }
@@ -47,10 +45,10 @@ pub const AppRunner = struct {
 
     /// `parse` returns the action function that should be called by the main app.
     pub fn parse(self: *Self, app: *const App) Error!command.ExecFn {
-        const iter = try std.process.argsWithAllocator(self.alloc);
+        const iter = try std.process.argsWithAllocator(self.arena.allocator());
 
         // Here we pass the child allocator because any values allocated on the client behalf may not be freed.
-        var cr = try Parser(std.process.ArgIterator).init(app, iter, self.arena.child_allocator);
+        var cr = try Parser(std.process.ArgIterator).init(app, iter, self.orig_allocator);
         defer cr.deinit();
 
         if (cr.parse()) |action| {

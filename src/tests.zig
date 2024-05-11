@@ -21,7 +21,7 @@ const StringSliceIterator = struct {
     }
 };
 
-fn runner() *AppRunner {
+fn runner() AppRunner {
     return AppRunner.init(alloc) catch unreachable;
 }
 
