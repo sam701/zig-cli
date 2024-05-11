@@ -1,12 +1,12 @@
 .{
-	.name = "standalone",
-	.version = "0.1.0",
-	.paths = .{"./src"},
-	.dependencies = .{
-		.@"zig-cli" = .{
-			// URL pattern: https://github.com/sam701/zig-cli/archive/<commit hash>.tar.gz
-			.url = "https://github.com/sam701/zig-cli/archive/56db2194b09bd3812e20323ef53cdeca3c120fca.tar.gz",
-			.hash = "12204b117e7639af2a3e37aef7149e9d2c3bbdf0d18f645dee24c895afbceebc2406",
-	    },
-	},
+    .name = "standalone",
+    .version = "0.1.0",
+    .paths = .{"./src"},
+    .dependencies = .{
+        .@"zig-cli" = .{
+            // URL pattern: https://github.com/sam701/zig-cli/archive/<commit hash>.tar.gz
+            .url = "https://github.com/sam701/zig-cli/archive/abf91b22869e076e1386b7b100876e0624853720.tar.gz",
+            .hash = "1220567f95aa81d2e6b67923177ae36dd72006f279b8fc6a42bb981ecfa412d9ec67",
+        },
+    },
 }

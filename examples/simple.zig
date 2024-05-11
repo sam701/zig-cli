@@ -110,7 +110,7 @@ fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
         .author = "sam701 & contributors",
     };
 
-    return r.parse(&app);
+    return r.getAction(&app);
 }
 
 pub fn main() anyerror!void {

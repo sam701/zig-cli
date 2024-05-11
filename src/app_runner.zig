@@ -43,8 +43,8 @@ pub const AppRunner = struct {
     pub const ArgumentError = error.ArgumentError;
     pub const Error = Allocator.Error || error{ArgumentError};
 
-    /// `parse` returns the action function that should be called by the main app.
-    pub fn parse(self: *Self, app: *const App) Error!command.ExecFn {
+    /// `getAction` returns the action function that should be called by the main app.
+    pub fn getAction(self: *Self, app: *const App) Error!command.ExecFn {
         const iter = try std.process.argsWithAllocator(self.arena.allocator());
 
         // Here we pass the child allocator because any values allocated on the client behalf may not be freed.
@@ -62,10 +62,10 @@ pub const AppRunner = struct {
 
     /// run calls `parse` and runs the action function returned.
     ///
-    /// Consider using `parse` instead of `run` if you want to free the app struct from the stack
+    /// Consider using `getAction` instead of `run` if you want to free the app struct from the stack
     /// before executing the action function. See `examples/simple.zig`.
     pub fn run(self: *Self, app: *const App) !void {
-        const action = try self.parse(app);
+        const action = try self.getAction(app);
         return action();
     }
 };
