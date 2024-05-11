@@ -1,5 +1,5 @@
 .{
-	.name = "zig-cli",
-	.version = "0.8.0",
-	.paths = .{"./src", "./build.zig", "./build.zig.zon"},
+    .name = "zig-cli",
+    .version = "0.9.0",
+    .paths = .{ "./src", "./build.zig", "./build.zig.zon" },
 }
