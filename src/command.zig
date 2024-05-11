@@ -1,5 +1,5 @@
 const std = @import("std");
-const ValueRef = @import("./value_ref.zig").ValueRef;
+pub const ValueRef = @import("./value_ref.zig").ValueRef;
 
 /// Main structure for the application.
 pub const App = struct {
@@ -44,7 +44,7 @@ pub const Command = struct {
     /// Description of the command.
     description: ?Description = null,
     /// List of options for the command.
-    options: ?[]const *Option = null,
+    options: ?[]const Option = null,
     /// Target of the command (subcommands or action).
     target: CommandTarget,
 };
@@ -60,7 +60,7 @@ pub const Description = struct {
 /// Union for different command targets.
 pub const CommandTarget = union(enum) {
     /// Subcommands of the command.
-    subcommands: []const *const Command,
+    subcommands: []const Command,
     /// Action to execute for the command.
     action: CommandAction,
 };
@@ -87,7 +87,7 @@ pub const Option = struct {
     /// Whether the option is required or not.
     required: bool = false,
     /// Reference to the value of the option.
-    value_ref: ValueRef,
+    value_ref: *ValueRef,
     /// Name of the value for the option.
     value_name: []const u8 = "VALUE",
     /// Environment variable name for the option.
@@ -96,10 +96,10 @@ pub const Option = struct {
 
 /// Structure representing positional arguments for an action.
 pub const PositionalArgs = struct {
-    /// List of positional arguments.
-    args: []const *PositionalArg,
-    /// If not set, all positional arguments are considered as required.
-    first_optional_arg: ?*const PositionalArg = null,
+    /// Required positional arguments.
+    required: ?[]const PositionalArg = null,
+    /// Optional positional arguments. There always follow the required ones.
+    optional: ?[]const PositionalArg = null,
 };
 
 /// Structure representing a positional argument.
@@ -107,7 +107,7 @@ pub const PositionalArg = struct {
     /// Name of the positional argument.
     name: []const u8,
     /// Help description for the positional argument.
-    help: []const u8,
+    help: ?[]const u8 = null,
     /// Reference to the value of the positional argument.
-    value_ref: ValueRef,
+    value_ref: *ValueRef,
 };

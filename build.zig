@@ -33,6 +33,7 @@ pub fn build(b: *std.Build) void {
     });
     simple.root_module.addImport("zig-cli", module);
     b.installArtifact(simple);
+    b.default_step.dependOn(&simple.step);
 
     const short = b.addExecutable(.{
         .target = target,
@@ -42,7 +43,5 @@ pub fn build(b: *std.Build) void {
     });
     short.root_module.addImport("zig-cli", module);
     b.installArtifact(short);
-
-    b.default_step.dependOn(&simple.step);
     b.default_step.dependOn(&short.step);
 }

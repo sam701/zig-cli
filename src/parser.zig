@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
 
 const command = @import("command.zig");
 const help = @import("./help.zig");
@@ -10,59 +11,79 @@ const mkRef = vref.mkRef;
 const value_parser = @import("value_parser.zig");
 const str_true = value_parser.str_true;
 const str_false = value_parser.str_false;
+const GlobalOptions = @import("GlobalOptions.zig");
+const PositionalArgsHelper = @import("PositionalArgsHelper.zig");
 
 pub const ParseResult = command.ExecFn;
 
-pub fn run(app: *const command.App, alloc: Allocator) anyerror!void {
-    var iter = try std.process.argsWithAllocator(alloc);
-    defer iter.deinit();
-
-    var cr = try Parser(std.process.ArgIterator).init(app, iter, alloc);
-    defer cr.deinit();
-
-    const action = try cr.parse();
-    return action();
-}
-
-var help_option_set: bool = false;
-
-var help_option = command.Option{
-    .long_name = "help",
-    .help = "Show this help output.",
-    .short_alias = 'h',
-    .value_ref = mkRef(&help_option_set),
+pub const EntityType = enum {
+    option,
+    positional_argument,
 };
+pub const ErrorData = union {
+    provided_string: []const u8,
+    entity_name: []const u8,
+    option_alias: u8,
+    invalid_value: struct {
+        entity_type: EntityType,
+        entity_name: []const u8,
+        provided_string: []const u8,
+        value_type: []const u8,
+        envvar: ?[]const u8 = null,
+    },
+};
+
+pub const ParseError = error{
+    UnknownOption,
+    UnknownOptionAlias,
+    UnknownSubcommand,
+    MissingRequiredOption,
+    MissingRequiredPositionalArgument,
+    MissingSubcommand,
+    MissingOptionValue,
+    UnexpectedPositionalArgument,
+    CommandDoesNotHavePositionalArguments,
+} || Allocator.Error || value_parser.ValueParseError;
 
 pub fn Parser(comptime Iterator: type) type {
     return struct {
         const Self = @This();
 
-        alloc: Allocator,
+        orig_allocator: Allocator,
+        arena: ArenaAllocator,
         arg_iterator: Iterator,
         app: *const command.App,
         command_path: std.ArrayList(*const command.Command),
         position_argument_ix: usize = 0,
         next_arg: ?[]const u8 = null,
+        global_options: *GlobalOptions,
+        error_data: ?ErrorData = null,
 
         pub fn init(app: *const command.App, it: Iterator, alloc: Allocator) !Self {
             return .{
-                .alloc = alloc,
+                .orig_allocator = alloc,
+                .arena = ArenaAllocator.init(alloc),
                 .arg_iterator = it,
                 .app = app,
                 .command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16),
+                .global_options = try GlobalOptions.init(app.help_config.color_usage, alloc),
             };
         }
 
         pub fn deinit(self: *Self) void {
             self.command_path.deinit();
+            self.global_options.deinit();
+            self.arena.deinit();
         }
 
         inline fn current_command(self: *const Self) *const command.Command {
             return self.command_path.items[self.command_path.items.len - 1];
         }
 
-        pub fn parse(self: *Self) anyerror!ParseResult {
+        pub fn parse(self: *Self) ParseError!ParseResult {
             try self.command_path.append(&self.app.command);
+
+            // TODO: run all options once before the main run to check if --help is present
 
             _ = self.nextArg();
             var args_only = false;
@@ -72,40 +93,38 @@ pub fn Parser(comptime Iterator: type) type {
                 } else if (argp.interpret(arg)) |interpretation| {
                     args_only = try self.process_interpretation(&interpretation);
                 } else |err| {
-                    switch (err) {
-                        error.MissingOptionArgument => self.fail("missing argument: '{s}'", .{arg}),
-                    }
+                    self.error_data = ErrorData{ .provided_string = arg };
+                    return err;
                 }
             }
             return self.finalize();
         }
 
-        fn finalize(self: *Self) !ParseResult {
+        fn finalize(self: *Self) ParseError!ParseResult {
             for (self.command_path.items) |cmd| {
                 if (cmd.options) |options| {
-                    for (options) |opt| {
+                    for (options) |*opt| {
                         try self.set_option_value_from_envvar(opt);
-                        try opt.value_ref.finalize(self.alloc);
+                        try opt.value_ref.finalize(self.orig_allocator);
 
                         if (opt.required and opt.value_ref.element_count == 0) {
-                            self.fail("missing required option '{s}'", .{opt.long_name});
+                            self.error_data = ErrorData{ .entity_name = opt.long_name };
+                            return error.MissingRequiredOption;
                         }
                     }
                 }
                 switch (cmd.target) {
                     .action => |act| {
-                        if (act.positional_args) |pargs| {
-                            var optional = false;
-                            for (pargs.args) |parg| {
-                                try parg.value_ref.finalize(self.alloc);
+                        if (act.positional_args) |*pargs| {
+                            const argh = PositionalArgsHelper{ .inner = pargs };
+                            var it = argh.iterator();
+                            const required_args_no = if (pargs.required) |req| req.len else 0;
+                            while (it.next()) |parg| {
+                                try parg.value_ref.finalize(self.orig_allocator);
 
-                                if (pargs.first_optional_arg) |first_opt| {
-                                    if (parg == first_opt) {
-                                        optional = true;
-                                    }
-                                }
-                                if (!optional and parg.value_ref.element_count == 0) {
-                                    self.fail("missing required positional argument '{s}'", .{parg.name});
+                                if (it.index <= required_args_no and parg.value_ref.element_count == 0) {
+                                    self.error_data = ErrorData{ .entity_name = parg.name };
+                                    return error.MissingRequiredPositionalArgument;
                                 }
                             }
                         }
@@ -119,79 +138,88 @@ pub fn Parser(comptime Iterator: type) type {
                     return act.exec;
                 },
                 .subcommands => {
-                    self.fail("command '{s}': no subcommand provided", .{self.current_command().name});
-                    unreachable;
+                    self.error_data = ErrorData{ .entity_name = self.current_command().name };
+                    return error.MissingSubcommand;
                 },
             }
         }
 
-        fn handlePositionalArgument(self: *Self, arg: []const u8) !void {
+        fn handlePositionalArgument(self: *Self, arg: []const u8) ParseError!void {
             const cmd = self.current_command();
             switch (cmd.target) {
                 .subcommands => {
-                    self.fail("command '{s}' cannot have positional arguments", .{cmd.name});
+                    self.error_data = ErrorData{ .entity_name = cmd.name };
+                    return error.CommandDoesNotHavePositionalArguments;
                 },
                 .action => |act| {
-                    if (act.positional_args) |posArgs| {
-                        if (self.position_argument_ix >= posArgs.args.len) {
-                            self.fail("unexpected positional argument '{s}'", .{arg});
+                    if (act.positional_args) |*posArgs| {
+                        var posH = PositionalArgsHelper{ .inner = posArgs };
+                        if (self.position_argument_ix >= posH.len()) {
+                            self.error_data = ErrorData{ .provided_string = arg };
+                            return error.UnexpectedPositionalArgument;
                         }
 
-                        var posArg = posArgs.args[self.position_argument_ix];
-                        var posArgRef = &posArg.value_ref;
-                        posArgRef.put(arg, self.alloc) catch |err| {
-                            self.fail("positional argument ({s}): cannot parse '{s}' as {s}: {s}", .{ posArg.name, arg, posArgRef.value_data.type_name, @errorName(err) });
-                            unreachable;
+                        const posArg = posH.at(self.position_argument_ix);
+                        var posArgRef = posArg.value_ref;
+                        posArgRef.put(arg, self.orig_allocator) catch |err| {
+                            self.error_data = ErrorData{
+                                .invalid_value = .{
+                                    .entity_type = .positional_argument,
+                                    .entity_name = posArg.name,
+                                    .provided_string = arg,
+                                    .value_type = posArgRef.value_data.type_name,
+                                },
+                            };
+                            return err;
                         };
                         if (posArgRef.value_type == .single) {
                             self.position_argument_ix += 1;
                         }
+                    } else {
+                        self.error_data = ErrorData{ .entity_name = cmd.name };
+                        return error.CommandDoesNotHavePositionalArguments;
                     }
                 },
             }
         }
 
-        fn set_option_value_from_envvar(self: *const Self, opt: *command.Option) !void {
-            if (opt.value_ref.element_count > 0) return;
-
-            if (opt.envvar) |envvar_name| {
-                if (std.process.getEnvVarOwned(self.alloc, envvar_name)) |value| {
-                    defer self.alloc.free(value);
-                    opt.value_ref.put(value, self.alloc) catch |err| {
-                        self.fail("envvar({s}): cannot parse {s} value '{s}': {s}", .{ envvar_name, opt.value_ref.value_data.type_name, value, @errorName(err) });
-                        unreachable;
-                    };
-                } else |err| {
-                    if (err != std.process.GetEnvVarOwnedError.EnvironmentVariableNotFound) {
-                        return err;
+        fn getEnvvarName(self: *Self, opt: *const command.Option) Allocator.Error!?[]const u8 {
+            if (opt.envvar) |ev| {
+                return ev;
+            } else {
+                if (self.app.option_envvar_prefix) |prefix| {
+                    var envvar_name = try self.arena.allocator().alloc(u8, opt.long_name.len + prefix.len);
+                    @memcpy(envvar_name[0..prefix.len], prefix);
+                    for (envvar_name[prefix.len..], opt.long_name) |*dest, name_char| {
+                        dest.* = if (name_char == '-') '_' else std.ascii.toUpper(name_char);
                     }
-                }
-            } else if (self.app.option_envvar_prefix) |prefix| {
-                var envvar_name = try self.alloc.alloc(u8, opt.long_name.len + prefix.len);
-                defer self.alloc.free(envvar_name);
-                @memcpy(envvar_name[0..prefix.len], prefix);
-                for (envvar_name[prefix.len..], opt.long_name) |*dest, name_char| {
-                    dest.* = if (name_char == '-') '_' else std.ascii.toUpper(name_char);
-                }
-
-                if (std.process.getEnvVarOwned(self.alloc, envvar_name)) |value| {
-                    defer self.alloc.free(value);
-                    opt.value_ref.put(value, self.alloc) catch |err| {
-                        self.fail(
-                            "envvar({s}): cannot parse {s} value '{s}': {s}",
-                            .{ envvar_name, opt.value_ref.value_data.type_name, value, @errorName(err) },
-                        );
-                        unreachable;
-                    };
-                } else |err| {
-                    if (err != std.process.GetEnvVarOwnedError.EnvironmentVariableNotFound) {
-                        return err;
-                    }
+                    return envvar_name;
+                } else {
+                    return null;
                 }
             }
         }
 
-        fn process_interpretation(self: *Self, int: *const argp.ArgumentInterpretation) !bool {
+        fn set_option_value_from_envvar(self: *Self, opt: *const command.Option) ParseError!void {
+            if (opt.value_ref.element_count > 0) return;
+
+            if (try self.getEnvvarName(opt)) |envvar_name| {
+                if (std.process.getEnvVarOwned(self.arena.allocator(), envvar_name)) |value| {
+                    opt.value_ref.put(value, self.orig_allocator) catch |err| {
+                        self.error_data = ErrorData{ .invalid_value = .{
+                            .entity_type = .option,
+                            .entity_name = opt.long_name,
+                            .provided_string = value,
+                            .value_type = opt.value_ref.value_data.type_name,
+                            .envvar = envvar_name,
+                        } };
+                        return err;
+                    };
+                } else |_| {}
+            }
+        }
+
+        fn process_interpretation(self: *Self, int: *const argp.ArgumentInterpretation) ParseError!bool {
             var args_only = false;
             try switch (int.*) {
                 .option => |opt| self.process_option(&opt),
@@ -199,13 +227,14 @@ pub fn Parser(comptime Iterator: type) type {
                 .other => |some_name| {
                     switch (self.current_command().target) {
                         .subcommands => |cmds| {
-                            for (cmds) |sc| {
+                            for (cmds) |*sc| {
                                 if (std.mem.eql(u8, sc.name, some_name)) {
                                     try self.command_path.append(sc);
                                     return false;
                                 }
                             }
-                            self.fail("no such subcommand '{s}'", .{some_name});
+                            self.error_data = ErrorData{ .provided_string = some_name };
+                            return error.UnknownSubcommand;
                         },
                         .action => try self.handlePositionalArgument(some_name),
                     }
@@ -227,104 +256,92 @@ pub fn Parser(comptime Iterator: type) type {
             self.next_arg = value;
         }
 
-        fn process_option(self: *Self, option_interpretation: *const argp.OptionInterpretation) !void {
-            var opt: *command.Option = switch (option_interpretation.option_type) {
-                .long => self.find_option_by_name(option_interpretation.name),
+        fn process_option(self: *Self, option_interpretation: *const argp.OptionInterpretation) ParseError!void {
+            var opt: *const command.Option = switch (option_interpretation.option_type) {
+                .long => try self.find_option_by_name(option_interpretation.name),
                 .short => a: {
-                    const active_command = self.current_command();
-                    self.set_concatenated_boolean_options(
-                        active_command,
+                    try self.set_concatenated_boolean_options(
+                        self.current_command(),
                         option_interpretation.name[0 .. option_interpretation.name.len - 1],
                     );
-                    break :a self.find_option_by_alias(
-                        active_command,
+                    break :a try self.find_option_by_alias(
+                        self.current_command(),
                         option_interpretation.name[option_interpretation.name.len - 1],
                     );
                 },
             };
 
-            if (opt == &help_option) {
-                try help.print_command_help(self.app, try self.command_path.toOwnedSlice());
+            if (opt == self.global_options.option_show_help) {
+                try help.print_command_help(self.app, try self.command_path.toOwnedSlice(), self.global_options);
                 std.posix.exit(0);
             }
 
             if (opt.value_ref.value_data.is_bool) {
+                const arena_alloc = self.arena.allocator();
                 if (option_interpretation.value) |opt_value| {
-                    var lw = try self.alloc.alloc(u8, opt_value.len);
-                    defer self.alloc.free(lw);
+                    var lw = try arena_alloc.alloc(u8, opt_value.len);
 
                     lw = std.ascii.lowerString(lw, opt_value);
-                    try opt.value_ref.put(lw, self.alloc);
+                    try opt.value_ref.put(lw, self.orig_allocator);
                     return;
                 }
 
                 if (self.nextArg()) |arg| {
                     if (arg.len > 0 and arg[0] != '-') {
-                        var lw = try self.alloc.alloc(u8, arg.len);
-                        defer self.alloc.free(lw);
+                        var lw = try arena_alloc.alloc(u8, arg.len);
 
                         lw = std.ascii.lowerString(lw, arg);
                         if (std.mem.eql(u8, lw, str_true) or std.mem.eql(u8, lw, str_false)) {
-                            try opt.value_ref.put(lw, self.alloc);
+                            try opt.value_ref.put(lw, self.orig_allocator);
                             return;
                         }
                     }
                     self.putArgBack(arg);
                 }
-                try opt.value_ref.put(str_true, self.alloc);
+                try opt.value_ref.put(str_true, self.orig_allocator);
             } else {
                 const arg = option_interpretation.value orelse self.nextArg() orelse {
-                    self.fail("missing argument for {s}", .{opt.long_name});
-                    unreachable;
+                    self.error_data = ErrorData{ .entity_name = opt.long_name };
+                    return error.MissingOptionValue;
                 };
-                opt.value_ref.put(arg, self.alloc) catch |err| {
-                    self.fail(
-                        "option({s}): cannot parse {s} value: {s}",
-                        .{
-                            opt.long_name,
-                            opt.value_ref.value_data.type_name,
-                            @errorName(err),
-                        },
-                    );
-                    unreachable;
+                opt.value_ref.put(arg, self.orig_allocator) catch |err| {
+                    self.error_data = ErrorData{ .invalid_value = .{
+                        .entity_type = .option,
+                        .entity_name = opt.long_name,
+                        .provided_string = arg,
+                        .value_type = opt.value_ref.value_data.type_name,
+                    } };
+                    return err;
                 };
             }
         }
 
-        fn fail(self: *const Self, comptime fmt: []const u8, args: anytype) void {
-            var p = Printer.init(std.io.getStdErr(), self.app.help_config.color_usage);
-
-            p.printInColor(self.app.help_config.color_error, "ERROR");
-            p.format(": ", .{});
-            p.format(fmt, args);
-            p.write(&.{'\n'});
-            std.posix.exit(1);
-        }
-
-        fn find_option_by_name(self: *const Self, option_name: []const u8) *command.Option {
-            if (std.mem.eql(u8, "help", option_name)) {
-                return &help_option;
-            }
+        fn find_option_by_name(self: *Self, option_name: []const u8) error{UnknownOption}!*const command.Option {
             for (0..self.command_path.items.len) |ix| {
                 const cmd = self.command_path.items[self.command_path.items.len - ix - 1];
                 if (cmd.options) |option_list| {
-                    for (option_list) |option| {
+                    for (option_list) |*option| {
                         if (std.mem.eql(u8, option.long_name, option_name)) {
                             return option;
                         }
                     }
                 }
             }
-            self.fail("no such option '--{s}'", .{option_name});
-            unreachable;
+            for (self.global_options.options) |option| {
+                if (std.mem.eql(u8, option.long_name, option_name)) {
+                    return option;
+                }
+            }
+            self.error_data = ErrorData{ .provided_string = option_name };
+            return error.UnknownOption;
         }
 
-        fn find_option_by_alias(self: *const Self, cmd: *const command.Command, option_alias: u8) *command.Option {
+        fn find_option_by_alias(self: *Self, cmd: *const command.Command, option_alias: u8) error{UnknownOptionAlias}!*const command.Option {
             if (option_alias == 'h') {
-                return &help_option;
+                return self.global_options.option_show_help;
             }
             if (cmd.options) |option_list| {
-                for (option_list) |option| {
+                for (option_list) |*option| {
                     if (option.short_alias) |alias| {
                         if (alias == option_alias) {
                             return option;
@@ -332,18 +349,18 @@ pub fn Parser(comptime Iterator: type) type {
                     }
                 }
             }
-            self.fail("no such option alias '-{c}'", .{option_alias});
-            unreachable;
+            self.error_data = ErrorData{ .option_alias = option_alias };
+            return error.UnknownOptionAlias;
         }
 
         /// Set boolean options provided like `-acde`
-        fn set_concatenated_boolean_options(self: *const Self, cmd: *const command.Command, options: []const u8) void {
+        fn set_concatenated_boolean_options(self: *Self, cmd: *const command.Command, options: []const u8) ParseError!void {
             for (options) |alias| {
-                var opt = self.find_option_by_alias(cmd, alias);
+                var opt = try self.find_option_by_alias(cmd, alias);
                 if (opt.value_ref.value_data.is_bool) {
-                    opt.value_ref.put("true", self.alloc) catch unreachable;
+                    opt.value_ref.put(str_true, self.orig_allocator) catch unreachable;
                 } else {
-                    self.fail("'-{c}' is not a boolean option", .{alias});
+                    return error.MissingOptionValue;
                 }
             }
         }

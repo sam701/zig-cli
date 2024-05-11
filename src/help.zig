@@ -2,14 +2,21 @@ const std = @import("std");
 const command = @import("command.zig");
 const Printer = @import("Printer.zig");
 const value_ref = @import("value_ref.zig");
+const GlobalOptions = @import("GlobalOptions.zig");
+const PositionalArgsHelper = @import("PositionalArgsHelper.zig");
 
 const color_clear = "0";
 
-pub fn print_command_help(app: *const command.App, command_path: []const *const command.Command) !void {
+pub fn print_command_help(
+    app: *const command.App,
+    command_path: []const *const command.Command,
+    global_options: *const GlobalOptions,
+) !void {
     const stdout = std.io.getStdOut();
     var help_printer = HelpPrinter{
-        .printer = Printer.init(stdout, app.help_config.color_usage),
+        .printer = Printer.init(stdout, global_options.color_usage),
         .help_config = &app.help_config,
+        .global_options = global_options,
     };
     if (command_path.len == 1) {
         help_printer.printAppHelp(app, command_path);
@@ -21,6 +28,7 @@ pub fn print_command_help(app: *const command.App, command_path: []const *const 
 const HelpPrinter = struct {
     printer: Printer,
     help_config: *const command.HelpConfig,
+    global_options: *const GlobalOptions,
 
     fn printAppHelp(self: *HelpPrinter, app: *const command.App, command_path: []const *const command.Command) void {
         self.printer.printColor(self.help_config.color_app_name);
@@ -49,22 +57,25 @@ const HelpPrinter = struct {
         switch (cmd.target) {
             .action => |act| {
                 if (act.positional_args) |pargs| {
-                    var closeOpt = false;
-                    for (pargs.args) |parg| {
-                        self.printer.write(" ");
-                        if (pargs.first_optional_arg) |opt| {
-                            if (opt == parg) {
-                                self.printer.write("[");
-                                closeOpt = true;
+                    if (pargs.required) |req| {
+                        for (req) |*parg| {
+                            self.printer.write(" ");
+                            self.printer.format("<{s}>", .{parg.name});
+                            if (parg.value_ref.value_type == value_ref.ValueType.multi) {
+                                self.printer.write("...");
                             }
                         }
-                        self.printer.format("<{s}>", .{parg.name});
-                        if (parg.value_ref.value_type == value_ref.ValueType.multi) {
-                            self.printer.write("...");
-                        }
                     }
-                    if (closeOpt) {
-                        self.printer.write("]");
+                    if (pargs.optional) |opt| {
+                        for (opt) |*parg| {
+                            self.printer.write(" ");
+                            self.printer.write("[");
+                            self.printer.format("<{s}>", .{parg.name});
+                            if (parg.value_ref.value_type == value_ref.ValueType.multi) {
+                                self.printer.write("...");
+                            }
+                            self.printer.write("]");
+                        }
                     }
                 }
             },
@@ -82,17 +93,22 @@ const HelpPrinter = struct {
 
         switch (cmd.target) {
             .action => |act| {
-                if (act.positional_args) |pargs| {
+                if (act.positional_args) |*pargs| {
                     self.printer.printInColor(self.help_config.color_section, "\nARGUMENTS:\n");
                     var max_arg_width: usize = 0;
-                    for (pargs.args) |parg| {
+                    const arg_h = PositionalArgsHelper{ .inner = pargs };
+                    var it = arg_h.iterator();
+                    while (it.next()) |parg| {
                         max_arg_width = @max(max_arg_width, parg.name.len);
                     }
-                    for (pargs.args) |parg| {
+                    it.index = 0;
+                    while (it.next()) |parg| {
                         self.printer.write("  ");
                         self.printer.printInColor(self.help_config.color_option, parg.name);
-                        self.printer.printSpaces(max_arg_width - parg.name.len + 3);
-                        self.printer.write(parg.help);
+                        if (parg.help) |help| {
+                            self.printer.printSpaces(max_arg_width - parg.name.len + 3);
+                            self.printer.write(help);
+                        }
                         self.printer.printNewLine();
                     }
                 }
@@ -126,46 +142,48 @@ const HelpPrinter = struct {
         self.printer.printInColor(self.help_config.color_section, "\nOPTIONS:\n");
         var option_column_width: usize = 7;
         if (cmd.options) |option_list| {
-            var max_option_width: usize = 0;
             for (option_list) |option| {
                 const w = option.long_name.len + option.value_name.len + 3;
-                max_option_width = @max(max_option_width, w);
-            }
-            option_column_width = max_option_width + 3;
-            for (option_list) |option| {
-                if (option.short_alias) |alias| {
-                    self.printer.printSpaces(2);
-                    self.printer.printColor(self.help_config.color_option);
-                    self.printer.format("-{c}", .{alias});
-                    self.printer.printColor(color_clear);
-                    self.printer.write(", ");
-                } else {
-                    self.printer.printSpaces(6);
-                }
-                self.printer.printColor(self.help_config.color_option);
-                self.printer.format("--{s}", .{option.long_name});
-                self.printer.printColor(color_clear);
-                var width = option.long_name.len;
-                if (!option.value_ref.value_data.is_bool) {
-                    self.printer.printColor(self.help_config.color_option);
-                    self.printer.format(" <{s}>", .{option.value_name});
-                    self.printer.printColor(color_clear);
-                    width += option.value_name.len + 3;
-                }
-                self.printer.printSpaces(option_column_width - width);
-
-                self.printer.format("{s}\n", .{option.help});
+                option_column_width = @max(option_column_width, w);
             }
         }
-        self.printer.write("  ");
+        for (self.global_options.options) |option| {
+            const w = option.long_name.len + option.value_name.len + 3;
+            option_column_width = @max(option_column_width, w);
+        }
+        option_column_width += 3;
+        if (cmd.options) |option_list| {
+            for (option_list) |*option| {
+                self.printOption(option, option_column_width);
+            }
+        }
+        for (self.global_options.options) |option| {
+            self.printOption(option, option_column_width);
+        }
+    }
+
+    fn printOption(self: *const HelpPrinter, option: *const command.Option, option_column_width: usize) void {
+        if (option.short_alias) |alias| {
+            self.printer.printSpaces(2);
+            self.printer.printColor(self.help_config.color_option);
+            self.printer.format("-{c}", .{alias});
+            self.printer.printColor(color_clear);
+            self.printer.write(", ");
+        } else {
+            self.printer.printSpaces(6);
+        }
         self.printer.printColor(self.help_config.color_option);
-        self.printer.write("-h");
+        self.printer.format("--{s}", .{option.long_name});
         self.printer.printColor(color_clear);
-        self.printer.write(", ");
-        self.printer.printColor(self.help_config.color_option);
-        self.printer.write("--help");
-        self.printer.printColor(color_clear);
-        self.printer.printSpaces(option_column_width - 4);
-        self.printer.format("Prints help information\n", .{});
+        var width = option.long_name.len;
+        if (!option.value_ref.value_data.is_bool) {
+            self.printer.printColor(self.help_config.color_option);
+            self.printer.format(" <{s}>", .{option.value_name});
+            self.printer.printColor(color_clear);
+            width += option.value_name.len + 3;
+        }
+        self.printer.printSpaces(option_column_width - width);
+
+        self.printer.format("{s}\n", .{option.help});
     }
 };

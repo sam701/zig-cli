@@ -5,8 +5,8 @@
     .dependencies = .{
         .@"zig-cli" = .{
             // URL pattern: https://github.com/sam701/zig-cli/archive/<commit hash>.tar.gz
-            .url = "https://github.com/sam701/zig-cli/archive/c12256bff1715a0a9e21dce17c546cc8c8b52bf7.tar.gz",
-            .hash = "1220c008492d9460c3be2b209600a948181e6efb3bf0d79a1633def499632e708f4b",
+            .url = "https://github.com/sam701/zig-cli/archive/abf91b22869e076e1386b7b100876e0624853720.tar.gz",
+            .hash = "1220567f95aa81d2e6b67923177ae36dd72006f279b8fc6a42bb981ecfa412d9ec67",
         },
     },
 }
