@@ -183,31 +183,28 @@ pub fn Parser(comptime Iterator: type) type {
             }
         }
 
+        fn getEnvvarName(self: *Self, opt: *const command.Option) Allocator.Error!?[]const u8 {
+            if (opt.envvar) |ev| {
+                return ev;
+            } else {
+                if (self.app.option_envvar_prefix) |prefix| {
+                    var envvar_name = try self.arena.allocator().alloc(u8, opt.long_name.len + prefix.len);
+                    @memcpy(envvar_name[0..prefix.len], prefix);
+                    for (envvar_name[prefix.len..], opt.long_name) |*dest, name_char| {
+                        dest.* = if (name_char == '-') '_' else std.ascii.toUpper(name_char);
+                    }
+                    return envvar_name;
+                } else {
+                    return null;
+                }
+            }
+        }
+
         fn set_option_value_from_envvar(self: *Self, opt: *const command.Option) ParseError!void {
             if (opt.value_ref.element_count > 0) return;
-            const arena_alloc = self.arena.allocator();
 
-            if (opt.envvar) |envvar_name| {
-                if (std.process.getEnvVarOwned(arena_alloc, envvar_name)) |value| {
-                    opt.value_ref.put(value, self.orig_allocator) catch |err| {
-                        self.error_data = ErrorData{ .invalid_value = .{
-                            .entity_type = .option,
-                            .entity_name = opt.long_name,
-                            .provided_string = value,
-                            .value_type = opt.value_ref.value_data.type_name,
-                            .envvar = envvar_name,
-                        } };
-                        return err;
-                    };
-                } else |_| {}
-            } else if (self.app.option_envvar_prefix) |prefix| {
-                var envvar_name = try arena_alloc.alloc(u8, opt.long_name.len + prefix.len);
-                @memcpy(envvar_name[0..prefix.len], prefix);
-                for (envvar_name[prefix.len..], opt.long_name) |*dest, name_char| {
-                    dest.* = if (name_char == '-') '_' else std.ascii.toUpper(name_char);
-                }
-
-                if (std.process.getEnvVarOwned(arena_alloc, envvar_name)) |value| {
+            if (try self.getEnvvarName(opt)) |envvar_name| {
+                if (std.process.getEnvVarOwned(self.arena.allocator(), envvar_name)) |value| {
                     opt.value_ref.put(value, self.orig_allocator) catch |err| {
                         self.error_data = ErrorData{ .invalid_value = .{
                             .entity_type = .option,
