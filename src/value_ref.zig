@@ -16,14 +16,14 @@ pub const ValueRef = struct {
         self.element_count += 1;
         switch (self.value_type) {
             .single => {
-                return self.value_data.value_parser(self.dest, value);
+                return self.value_data.value_parser(self.dest, value, alloc);
             },
             .multi => |*list| {
                 if (list.list_ptr == null) {
                     list.list_ptr = try list.vtable.createList(alloc);
                 }
                 const value_ptr = try list.vtable.addOne(list.list_ptr.?, alloc);
-                try self.value_data.value_parser(value_ptr, value);
+                try self.value_data.value_parser(value_ptr, value, alloc);
             },
         }
     }
