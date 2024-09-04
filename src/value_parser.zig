@@ -14,19 +14,19 @@ pub const ValueData = struct {
 
 pub fn getValueData(comptime T: type) ValueData {
     const ValueType = switch (@typeInfo(T)) {
-        .Optional => |oinfo| oinfo.child,
+        .optional => |oinfo| oinfo.child,
         else => T,
     };
     return switch (@typeInfo(ValueType)) {
-        .Int => intData(ValueType, T),
-        .Float => floatData(ValueType, T),
-        .Bool => boolData(T),
-        .Pointer => |pinfo| {
+        .int => intData(ValueType, T),
+        .float => floatData(ValueType, T),
+        .bool => boolData(T),
+        .pointer => |pinfo| {
             if (pinfo.size == .Slice and pinfo.child == u8) {
                 return stringData(T);
             }
         },
-        .Enum => enumData(ValueType, T),
+        .@"enum" => enumData(ValueType, T),
         else => @compileError("unsupported value type"),
     };
 }
@@ -93,7 +93,7 @@ fn stringData(comptime DestinationType: type) ValueData {
 }
 
 fn enumData(comptime ValueType: type, comptime DestinationType: type) ValueData {
-    const edata = @typeInfo(ValueType).Enum;
+    const edata = @typeInfo(ValueType).@"enum";
     return .{
         .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
