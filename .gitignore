@@ -1,6 +1,5 @@
 refs/
 tryout/
 zig-cache/
-zig-out/
 .zig-cache/
-
+zig-out/

@@ -57,10 +57,10 @@ pub fn allocRef(dest: anytype, alloc: Allocator) *ValueRef {
 
 pub fn mkRef(dest: anytype) ValueRef {
     const ti = @typeInfo(@TypeOf(dest));
-    const t = ti.Pointer.child;
+    const t = ti.pointer.child;
 
     switch (@typeInfo(t)) {
-        .Pointer => |pinfo| {
+        .pointer => |pinfo| {
             switch (pinfo.size) {
                 .Slice => {
                     if (pinfo.child == u8) {
