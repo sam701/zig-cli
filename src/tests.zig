@@ -71,9 +71,11 @@ test "long option" {
 
     try runOptions(&.{ "cmd", "--aa", "val" }, &.{opt});
     try std.testing.expectEqualStrings("val", aa);
+    alloc.free(aa);
 
     try runOptions(&.{ "cmd", "--aa=bb" }, &.{opt});
     try std.testing.expectEqualStrings("bb", aa);
+    alloc.free(aa);
 }
 
 test "short option" {
@@ -89,9 +91,11 @@ test "short option" {
 
     try runOptions(&.{ "abc", "-a", "val" }, &.{opt});
     try std.testing.expectEqualStrings("val", aa);
+    alloc.free(aa);
 
     try runOptions(&.{ "abc", "-a=bb" }, &.{opt});
     try std.testing.expectEqualStrings("bb", aa);
+    alloc.free(aa);
 }
 
 test "concatenated aliases" {
@@ -114,6 +118,7 @@ test "concatenated aliases" {
 
     try runOptions(&.{ "abc", "-ba", "val" }, &.{ opt, bbopt });
     try std.testing.expectEqualStrings("val", aa);
+    alloc.free(aa);
     try expect(bb);
 }
 
@@ -231,10 +236,13 @@ test "string list" {
     try runOptions(&.{ "abc", "--aa=a1", "--aa", "a2", "-a", "a3", "-a=a4" }, &.{aa_opt});
     try expect(aa.len == 4);
     try std.testing.expectEqualStrings("a1", aa[0]);
+    alloc.free(aa[0]);
     try std.testing.expectEqualStrings("a2", aa[1]);
+    alloc.free(aa[1]);
     try std.testing.expectEqualStrings("a3", aa[2]);
+    alloc.free(aa[2]);
     try std.testing.expectEqualStrings("a4", aa[3]);
-
+    alloc.free(aa[3]);
     alloc.free(aa);
 }
 
@@ -271,12 +279,17 @@ test "mix positional arguments and options" {
     defer std.testing.allocator.free(args);
 
     try std.testing.expectEqualStrings("val", aav);
+    alloc.free(aav);
     try std.testing.expectEqualStrings("tt", bbv);
+    alloc.free(bbv);
     try std.testing.expect(arg1 == 178);
     try std.testing.expectEqual(@as(usize, 3), args.len);
     try std.testing.expectEqualStrings("arg2", args[0]);
+    alloc.free(args[0]);
     try std.testing.expectEqualStrings("--arg3", args[1]);
+    alloc.free(args[1]);
     try std.testing.expectEqualStrings("-arg4", args[2]);
+    alloc.free(args[2]);
 }
 
 test "parse enums" {

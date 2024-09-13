@@ -1,9 +1,10 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 pub const ValueParseError = error{
     InvalidValue,
-};
-pub const ValueParser = *const fn (dest: *anyopaque, value: []const u8) ValueParseError!void;
+} || std.mem.Allocator.Error;
+pub const ValueParser = *const fn (dest: *anyopaque, value: []const u8, alloc: Allocator) ValueParseError!void;
 
 pub const ValueData = struct {
     value_size: usize,
@@ -35,7 +36,8 @@ fn intData(comptime ValueType: type, comptime DestinationType: type) ValueData {
     return .{
         .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
-            fn parser(dest: *anyopaque, value: []const u8) ValueParseError!void {
+            fn parser(dest: *anyopaque, value: []const u8, alloc: Allocator) ValueParseError!void {
+                _ = alloc;
                 const dt: *DestinationType = @alignCast(@ptrCast(dest));
                 dt.* = std.fmt.parseInt(ValueType, value, 10) catch return error.InvalidValue;
             }
@@ -48,7 +50,8 @@ fn floatData(comptime ValueType: type, comptime DestinationType: type) ValueData
     return .{
         .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
-            fn parser(dest: *anyopaque, value: []const u8) ValueParseError!void {
+            fn parser(dest: *anyopaque, value: []const u8, alloc: Allocator) ValueParseError!void {
+                _ = alloc;
                 const dt: *DestinationType = @ptrCast(@alignCast(dest));
                 dt.* = std.fmt.parseFloat(ValueType, value) catch return error.InvalidValue;
             }
@@ -65,7 +68,8 @@ fn boolData(comptime DestinationType: type) ValueData {
         .value_size = @sizeOf(DestinationType),
         .is_bool = true,
         .value_parser = struct {
-            fn parser(dest: *anyopaque, value: []const u8) ValueParseError!void {
+            fn parser(dest: *anyopaque, value: []const u8, alloc: Allocator) ValueParseError!void {
+                _ = alloc;
                 const dt: *DestinationType = @ptrCast(@alignCast(dest));
 
                 if (std.mem.eql(u8, value, str_true)) {
@@ -83,9 +87,10 @@ fn stringData(comptime DestinationType: type) ValueData {
     return .{
         .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
-            fn parser(dest: *anyopaque, value: []const u8) ValueParseError!void {
+            fn parser(dest: *anyopaque, value: []const u8, alloc: Allocator) ValueParseError!void {
                 const dt: *DestinationType = @ptrCast(@alignCast(dest));
-                dt.* = value;
+                const cpy = try alloc.dupe(u8, value);
+                dt.* = cpy;
             }
         }.parser,
         .type_name = "string",
@@ -97,7 +102,8 @@ fn enumData(comptime ValueType: type, comptime DestinationType: type) ValueData 
     return .{
         .value_size = @sizeOf(DestinationType),
         .value_parser = struct {
-            fn parser(dest: *anyopaque, value: []const u8) ValueParseError!void {
+            fn parser(dest: *anyopaque, value: []const u8, alloc: Allocator) ValueParseError!void {
+                _ = alloc;
                 inline for (edata.fields) |field| {
                     if (std.mem.eql(u8, field.name, value)) {
                         const dt: *DestinationType = @ptrCast(@alignCast(dest));
