@@ -23,7 +23,7 @@ pub inline fn write(self: *const Self, text: []const u8) void {
     _ = self.out.write(text) catch unreachable;
 }
 
-pub inline fn printNewLine(self: *Self) void {
+pub inline fn printNewLine(self: *const Self) void {
     self.write("\n");
 }
 

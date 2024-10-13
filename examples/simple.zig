@@ -85,7 +85,7 @@ fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
                             },
                             .{
                                 .long_name = "int",
-                                .help = "this is an int",
+                                .help = "this is an int\nwith the second line",
                                 .value_ref = r.mkRef(&config.int),
                             },
                             .{

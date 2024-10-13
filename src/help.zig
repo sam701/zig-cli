@@ -182,8 +182,16 @@ const HelpPrinter = struct {
             self.printer.printColor(color_clear);
             width += option.value_name.len + 3;
         }
-        self.printer.printSpaces(option_column_width - width);
 
-        self.printer.format("{s}\n", .{option.help});
+        // print option help
+        self.printer.printSpaces(option_column_width - width);
+        var it = std.mem.splitScalar(u8, option.help, '\n');
+        var lineNo: usize = 0;
+        while (it.next()) |line| : (lineNo += 1) {
+            if (lineNo > 0) {
+                self.printer.printSpaces(option_column_width + 8);
+            }
+            self.printer.format("{s}\n", .{line});
+        }
     }
 };
