@@ -62,7 +62,7 @@ pub fn mkRef(dest: anytype) ValueRef {
     switch (@typeInfo(t)) {
         .pointer => |pinfo| {
             switch (pinfo.size) {
-                .Slice => {
+                .slice => {
                     if (pinfo.child == u8) {
                         return .{
                             .dest = @ptrCast(dest),

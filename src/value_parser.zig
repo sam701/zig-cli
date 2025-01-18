@@ -23,7 +23,7 @@ pub fn getValueData(comptime T: type) ValueData {
         .float => floatData(ValueType, T),
         .bool => boolData(T),
         .pointer => |pinfo| {
-            if (pinfo.size == .Slice and pinfo.child == u8) {
+            if (pinfo.size == .slice and pinfo.child == u8) {
                 return stringData(T);
             }
         },
