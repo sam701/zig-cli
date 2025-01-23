@@ -34,10 +34,19 @@ pub const AppRunner = struct {
 
     /// mkSlice allocates a slice and copies the given content into it.
     /// The slice will be freed when the `parse` returns.
-    pub fn mkSlice(self: *Self, comptime T: type, content: []const T) ![]T {
+    fn mkSlice(self: *Self, comptime T: type, content: []const T) ![]T {
         const dest = try self.arena.allocator().alloc(T, content.len);
         std.mem.copyForwards(T, dest, content);
         return dest;
+    }
+    pub fn mkPositionalArgs(self: *Self, args: []const command.PositionalArg) ![]command.PositionalArg {
+        return self.mkSlice(command.PositionalArg, args);
+    }
+    pub fn mkOptions(self: *Self, args: []const command.Option) ![]command.Option {
+        return self.mkSlice(command.Option, args);
+    }
+    pub fn mkCommands(self: *Self, args: []const command.Command) ![]command.Command {
+        return self.mkSlice(command.Command, args);
     }
 
     pub const ArgumentError = error.ArgumentError;

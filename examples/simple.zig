@@ -11,6 +11,7 @@ var config = struct {
     float: f64 = 0.34,
     arg1: u64 = 0,
     arg2: []const []const u8 = undefined,
+    sub3_opt: ?u64 = null,
 }{};
 
 fn sub3(r: *cli.AppRunner) !cli.Command {
@@ -19,17 +20,25 @@ fn sub3(r: *cli.AppRunner) !cli.Command {
         .description = cli.Description{
             .one_line = "sub3 with positional arguments",
         },
+        .options = try r.mkOptions(&.{
+            cli.Option{
+                .long_name = "sub3-opt",
+                .help = "an integer option in a subcommand",
+                .value_ref = r.mkRef(&config.sub3_opt),
+                .value_name = "INT",
+            },
+        }),
         .target = cli.CommandTarget{
             .action = cli.CommandAction{
                 .positional_args = cli.PositionalArgs{
-                    .required = try r.mkSlice(cli.PositionalArg, &.{
+                    .required = try r.mkPositionalArgs(&.{
                         .{
                             .name = "ARG1",
                             .help = "arg1 help",
                             .value_ref = r.mkRef(&config.arg1),
                         },
                     }),
-                    .optional = try r.mkSlice(cli.PositionalArg, &.{
+                    .optional = try r.mkPositionalArgs(&.{
                         .{
                             .name = "ARG2",
                             .help = "multiple arg2 help",
@@ -63,7 +72,7 @@ fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
                 .one_line = "This a simple CLI app. Enjoy!",
             },
             .target = cli.CommandTarget{
-                .subcommands = &.{
+                .subcommands = try r.mkCommands(&.{
                     cli.Command{
                         .name = "sub1",
                         .description = cli.Description{
@@ -74,7 +83,7 @@ fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
                             \\And this is line 3.
                             ,
                         },
-                        .options = &.{
+                        .options = try r.mkOptions(&.{
                             .{
                                 .long_name = "ip",
                                 .help = "this is the IP address",
@@ -99,12 +108,12 @@ fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
                                 .help = "this is a float",
                                 .value_ref = r.mkRef(&config.float),
                             },
-                        },
+                        }),
                         .target = cli.CommandTarget{
                             .subcommands = &.{ sub2, try sub3(&r) },
                         },
                     },
-                },
+                }),
             },
         },
         .version = "0.10.3",
