@@ -20,7 +20,7 @@ fn sub3(r: *cli.AppRunner) !cli.Command {
         .description = cli.Description{
             .one_line = "sub3 with positional arguments",
         },
-        .options = try r.mkOptions(&.{
+        .options = try r.allocOptions(&.{
             cli.Option{
                 .long_name = "sub3-opt",
                 .help = "an integer option in a subcommand",
@@ -31,14 +31,14 @@ fn sub3(r: *cli.AppRunner) !cli.Command {
         .target = cli.CommandTarget{
             .action = cli.CommandAction{
                 .positional_args = cli.PositionalArgs{
-                    .required = try r.mkPositionalArgs(&.{
+                    .required = try r.allocPositionalArgs(&.{
                         .{
                             .name = "ARG1",
                             .help = "arg1 help",
                             .value_ref = r.mkRef(&config.arg1),
                         },
                     }),
-                    .optional = try r.mkPositionalArgs(&.{
+                    .optional = try r.allocPositionalArgs(&.{
                         .{
                             .name = "ARG2",
                             .help = "multiple arg2 help",
@@ -65,6 +65,10 @@ fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
         },
     };
 
+    // Since we call r.getAction in this fuction, all r.alloc* invocation are unnecessary.
+    // We can directly pass slices of commands, options, and posititional arguments,
+    // like `.options = &.{....}`
+
     const app = cli.App{
         .command = cli.Command{
             .name = "simple",
@@ -72,7 +76,7 @@ fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
                 .one_line = "This a simple CLI app. Enjoy!",
             },
             .target = cli.CommandTarget{
-                .subcommands = try r.mkCommands(&.{
+                .subcommands = try r.allocCommands(&.{
                     cli.Command{
                         .name = "sub1",
                         .description = cli.Description{
@@ -83,7 +87,7 @@ fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
                             \\And this is line 3.
                             ,
                         },
-                        .options = try r.mkOptions(&.{
+                        .options = try r.allocOptions(&.{
                             .{
                                 .long_name = "ip",
                                 .help = "this is the IP address",
