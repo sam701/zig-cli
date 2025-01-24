@@ -4,9 +4,9 @@
     .paths = .{"./src"},
     .dependencies = .{
         .@"zig-cli" = .{
-            // URL pattern: https://github.com/sam701/zig-cli/archive/<commit hash>.tar.gz
-            .url = "https://github.com/sam701/zig-cli/archive/f6925c35c5dbab5880fbfe197e9285983d859372.tar.gz",
-            .hash = "1220cc1cf7dff2a1c0df453620a2469ee1384e728526a35c38a27d45b4def8a124f4",
+            // zig fetch --save git+https://github.com/sam701/zig-cli
+            .url = "git+https://github.com/sam701/zig-cli#3795f25a5c0cba4013eea31db012007fb8b4d82c",
+            .hash = "122088ae1fc585b9f617c5fe9545acae35bce6c43e1eb7cd83172628804dca519753",
         },
     },
 }
