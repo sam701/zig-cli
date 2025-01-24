@@ -37,7 +37,7 @@ pub fn main() !void {
     const app = cli.App{
         .command = cli.Command{
             .name = "short",
-            .options = &.{
+            .options = try r.allocOptions(&.{
                 // Define an Option for the "host" command-line argument.
                 .{
                     .long_name = "host",
@@ -52,8 +52,7 @@ pub fn main() !void {
                     .required = true,
                     .value_ref = r.mkRef(&config.port),
                 },
-
-            },
+            }),
             .target = cli.CommandTarget{
                 .action = cli.CommandAction{ .exec = run_server },
             },
