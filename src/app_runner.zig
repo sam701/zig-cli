@@ -50,8 +50,7 @@ pub const AppRunner = struct {
         return self.allocSlice(command.Command, args);
     }
 
-    pub const ArgumentError = error.ArgumentError;
-    pub const Error = Allocator.Error || error{ArgumentError};
+    pub const Error = Allocator.Error;
 
     /// `getAction` returns the action function that should be called by the main app.
     pub fn getAction(self: *Self, app: *const App) Error!command.ExecFn {
