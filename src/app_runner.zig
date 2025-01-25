@@ -8,6 +8,7 @@ const parser = @import("parser.zig");
 const Parser = parser.Parser;
 const Printer = @import("Printer.zig");
 const command = @import("command.zig");
+const help = @import("./help.zig");
 
 pub const AppRunner = struct {
     // This arena and its allocator is intended to be used only for the value references
@@ -65,7 +66,11 @@ pub const AppRunner = struct {
             return action;
         } else |err| {
             processError(err, cr.error_data orelse unreachable, app);
-            return ArgumentError;
+            if (app.help_config.print_help_on_error) {
+                _ = std.io.getStdOut().write("\n") catch unreachable;
+                try help.print_command_help(app, try cr.command_path.toOwnedSlice(), cr.global_options);
+            }
+            std.posix.exit(1);
         }
     }
 
@@ -119,5 +124,4 @@ fn printError(app: *const App, comptime fmt: []const u8, args: anytype) void {
     p.format(": ", .{});
     p.format(fmt, args);
     p.write(&.{'\n'});
-    std.posix.exit(1);
 }

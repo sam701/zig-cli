@@ -35,6 +35,9 @@ pub const HelpConfig = struct {
     color_option: []const u8 = "32",
     /// Color for error messages in help.
     color_error: []const u8 = "31;1",
+
+    /// Whether to print last command help on errors like missing arguments or options.
+    print_help_on_error: bool = true,
 };
 
 /// Structure representing a command.
