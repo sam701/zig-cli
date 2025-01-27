@@ -282,7 +282,15 @@ pub fn Parser(comptime Iterator: type) type {
                     var lw = try arena_alloc.alloc(u8, opt_value.len);
 
                     lw = std.ascii.lowerString(lw, opt_value);
-                    try opt.value_ref.put(lw, self.orig_allocator);
+                    opt.value_ref.put(lw, self.orig_allocator) catch |err| {
+                        self.error_data = ErrorData{ .invalid_value = .{
+                            .entity_type = .option,
+                            .entity_name = opt.long_name,
+                            .provided_string = opt_value,
+                            .value_type = opt.value_ref.value_data.type_name,
+                        } };
+                        return err;
+                    };
                     return;
                 }
 
