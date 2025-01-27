@@ -70,6 +70,7 @@ fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
     // like `.options = &.{....}`
 
     const app = cli.App{
+        .option_envvar_prefix = "CLI_",
         .command = cli.Command{
             .name = "simple",
             .description = cli.Description{
@@ -100,6 +101,7 @@ fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
                                 .long_name = "int",
                                 .help = "this is an int\nwith the second line",
                                 .value_ref = r.mkRef(&config.int),
+                                .envvar = "INT",
                             },
                             .{
                                 .long_name = "bool",
@@ -152,6 +154,7 @@ fn freeConfig() void {
 
 fn run_sub3() !void {
     const c = &config;
+    std.log.debug("int: {}", .{c.int});
     std.log.debug("sub3: arg1: {}", .{c.arg1});
     for (c.arg2) |arg| {
         std.log.debug("sub3: arg2: {s}", .{arg});

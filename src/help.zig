@@ -1,9 +1,11 @@
 const std = @import("std");
 const command = @import("command.zig");
+const parser = @import("./parser.zig");
 const Printer = @import("Printer.zig");
 const value_ref = @import("value_ref.zig");
 const GlobalOptions = @import("GlobalOptions.zig");
 const PositionalArgsHelper = @import("PositionalArgsHelper.zig");
+const Allocator = std.mem.Allocator;
 
 const color_clear = "0";
 
@@ -13,11 +15,17 @@ pub fn print_command_help(
     global_options: *const GlobalOptions,
 ) !void {
     const stdout = std.io.getStdOut();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    var arena = std.heap.ArenaAllocator.init(allocator);
     var help_printer = HelpPrinter{
+        .app = app,
         .printer = Printer.init(stdout, global_options.color_usage),
-        .help_config = &app.help_config,
         .global_options = global_options,
+        .allocator = arena.allocator(),
     };
+    defer arena.deinit();
+
     if (command_path.len == 1) {
         help_printer.printAppHelp(app, command_path);
     } else {
@@ -26,12 +34,13 @@ pub fn print_command_help(
 }
 
 const HelpPrinter = struct {
+    app: *const command.App,
     printer: Printer,
-    help_config: *const command.HelpConfig,
     global_options: *const GlobalOptions,
+    allocator: Allocator,
 
     fn printAppHelp(self: *HelpPrinter, app: *const command.App, command_path: []const *const command.Command) void {
-        self.printer.printColor(self.help_config.color_app_name);
+        self.printer.printColor(self.app.help_config.color_app_name);
         self.printer.format("{s}\n", .{app.command.name});
         self.printer.printColor(color_clear);
         if (app.version) |v| {
@@ -46,9 +55,9 @@ const HelpPrinter = struct {
     }
 
     fn printCommandHelp(self: *HelpPrinter, command_path: []const *const command.Command) void {
-        self.printer.printInColor(self.help_config.color_section, "USAGE:");
+        self.printer.printInColor(self.app.help_config.color_section, "USAGE:");
         self.printer.format("\n  ", .{});
-        self.printer.printColor(self.help_config.color_option);
+        self.printer.printColor(self.app.help_config.color_option);
         for (command_path) |cmd| {
             self.printer.format("{s} ", .{cmd.name});
         }
@@ -94,7 +103,7 @@ const HelpPrinter = struct {
         switch (cmd.target) {
             .action => |act| {
                 if (act.positional_args) |*pargs| {
-                    self.printer.printInColor(self.help_config.color_section, "\nARGUMENTS:\n");
+                    self.printer.printInColor(self.app.help_config.color_section, "\nARGUMENTS:\n");
                     var max_arg_width: usize = 0;
                     const arg_h = PositionalArgsHelper{ .inner = pargs };
                     var it = arg_h.iterator();
@@ -104,7 +113,7 @@ const HelpPrinter = struct {
                     it.index = 0;
                     while (it.next()) |parg| {
                         self.printer.write("  ");
-                        self.printer.printInColor(self.help_config.color_option, parg.name);
+                        self.printer.printInColor(self.app.help_config.color_option, parg.name);
                         if (parg.help) |help| {
                             self.printer.printSpaces(max_arg_width - parg.name.len + 3);
                             self.printer.write(help);
@@ -114,7 +123,7 @@ const HelpPrinter = struct {
                 }
             },
             .subcommands => |sc_list| {
-                self.printer.printInColor(self.help_config.color_section, "\nCOMMANDS:\n");
+                self.printer.printInColor(self.app.help_config.color_section, "\nCOMMANDS:\n");
 
                 var max_cmd_width: usize = 0;
                 for (sc_list) |sc| {
@@ -122,7 +131,7 @@ const HelpPrinter = struct {
                 }
                 const cmd_column_width = max_cmd_width + 3;
                 for (sc_list) |sc| {
-                    self.printer.printColor(self.help_config.color_option);
+                    self.printer.printColor(self.app.help_config.color_option);
                     self.printer.format("  {s}", .{sc.name});
                     self.printer.printColor(color_clear);
                     if (sc.description) |desc| {
@@ -139,7 +148,7 @@ const HelpPrinter = struct {
             },
         }
 
-        self.printer.printInColor(self.help_config.color_section, "\nOPTIONS:\n");
+        self.printer.printInColor(self.app.help_config.color_section, "\nOPTIONS:\n");
         var option_column_width: usize = 7;
         if (cmd.options) |option_list| {
             for (option_list) |option| {
@@ -165,19 +174,19 @@ const HelpPrinter = struct {
     fn printOption(self: *const HelpPrinter, option: *const command.Option, option_column_width: usize) void {
         if (option.short_alias) |alias| {
             self.printer.printSpaces(2);
-            self.printer.printColor(self.help_config.color_option);
+            self.printer.printColor(self.app.help_config.color_option);
             self.printer.format("-{c}", .{alias});
             self.printer.printColor(color_clear);
             self.printer.write(", ");
         } else {
             self.printer.printSpaces(6);
         }
-        self.printer.printColor(self.help_config.color_option);
+        self.printer.printColor(self.app.help_config.color_option);
         self.printer.format("--{s}", .{option.long_name});
         self.printer.printColor(color_clear);
         var width = option.long_name.len;
         if (!option.value_ref.value_data.is_bool) {
-            self.printer.printColor(self.help_config.color_option);
+            self.printer.printColor(self.app.help_config.color_option);
             self.printer.format(" <{s}>", .{option.value_name});
             self.printer.printColor(color_clear);
             width += option.value_name.len + 3;
@@ -189,9 +198,19 @@ const HelpPrinter = struct {
         var lineNo: usize = 0;
         while (it.next()) |line| : (lineNo += 1) {
             if (lineNo > 0) {
+                self.printer.printNewLine();
                 self.printer.printSpaces(option_column_width + 8);
             }
-            self.printer.format("{s}\n", .{line});
+            self.printer.write(line);
         }
+        const envvar = parser.getEnvvarName(
+            option,
+            self.app.option_envvar_prefix,
+            self.allocator,
+        ) catch unreachable;
+        if (envvar) |ev| {
+            self.printer.format(" [env: {s}]", .{ev});
+        }
+        self.printer.printNewLine();
     }
 };

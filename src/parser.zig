@@ -183,27 +183,10 @@ pub fn Parser(comptime Iterator: type) type {
             }
         }
 
-        fn getEnvvarName(self: *Self, opt: *const command.Option) Allocator.Error!?[]const u8 {
-            if (opt.envvar) |ev| {
-                return ev;
-            } else {
-                if (self.app.option_envvar_prefix) |prefix| {
-                    var envvar_name = try self.arena.allocator().alloc(u8, opt.long_name.len + prefix.len);
-                    @memcpy(envvar_name[0..prefix.len], prefix);
-                    for (envvar_name[prefix.len..], opt.long_name) |*dest, name_char| {
-                        dest.* = if (name_char == '-') '_' else std.ascii.toUpper(name_char);
-                    }
-                    return envvar_name;
-                } else {
-                    return null;
-                }
-            }
-        }
-
         fn set_option_value_from_envvar(self: *Self, opt: *const command.Option) ParseError!void {
             if (opt.value_ref.element_count > 0) return;
 
-            if (try self.getEnvvarName(opt)) |envvar_name| {
+            if (try getEnvvarName(opt, self.app.option_envvar_prefix, self.arena.allocator())) |envvar_name| {
                 if (std.process.getEnvVarOwned(self.arena.allocator(), envvar_name)) |value| {
                     opt.value_ref.put(value, self.orig_allocator) catch |err| {
                         self.error_data = ErrorData{ .invalid_value = .{
@@ -373,4 +356,21 @@ pub fn Parser(comptime Iterator: type) type {
             }
         }
     };
+}
+
+pub fn getEnvvarName(opt: *const command.Option, app_envvar_prefix: ?[]const u8, allocator: Allocator) Allocator.Error!?[]const u8 {
+    if (opt.envvar) |ev| {
+        return ev;
+    } else {
+        if (app_envvar_prefix) |prefix| {
+            var envvar_name = try allocator.alloc(u8, opt.long_name.len + prefix.len);
+            @memcpy(envvar_name[0..prefix.len], prefix);
+            for (envvar_name[prefix.len..], opt.long_name) |*dest, name_char| {
+                dest.* = if (name_char == '-') '_' else std.ascii.toUpper(name_char);
+            }
+            return envvar_name;
+        } else {
+            return null;
+        }
+    }
 }
