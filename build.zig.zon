@@ -1,5 +1,6 @@
 .{
-    .name = "zig-cli",
+    .name = .cli,
+    .fingerprint = 0x48f6513cff9ee2d9,
     .version = "0.9.0",
     .paths = .{ "./src", "./build.zig", "./build.zig.zon" },
 }
