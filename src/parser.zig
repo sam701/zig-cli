@@ -351,6 +351,7 @@ pub fn Parser(comptime Iterator: type) type {
                 if (opt.value_ref.value_data.is_bool) {
                     opt.value_ref.put(str_true, self.orig_allocator) catch unreachable;
                 } else {
+                    self.error_data = ErrorData{ .entity_name = opt.value_name };
                     return error.MissingOptionValue;
                 }
             }
