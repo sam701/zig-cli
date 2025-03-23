@@ -116,7 +116,7 @@ fn processError(err: parser.ParseError, err_data: parser.ErrorData, app: *const 
     }
 }
 
-fn printError(app: *const App, comptime fmt: []const u8, args: anytype) void {
+pub fn printError(app: *const App, comptime fmt: []const u8, args: anytype) void {
     var p = Printer.init(std.io.getStdErr(), app.help_config.color_usage);
 
     p.printInColor(app.help_config.color_error, "ERROR");
