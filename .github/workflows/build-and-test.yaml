@@ -19,6 +19,7 @@ jobs:
       - run: zig build
       - run: zig build test
       - run: cd examples/standalone && zig build
+      - run: zig build docs
       - name: Upload docs artifact
         if: github.ref == 'refs/heads/main' && github.event_name != 'schedule'
         uses: actions/upload-pages-artifact@v3
