@@ -15,7 +15,7 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const zigcli_dep = b.dependency("zig-cli", .{ .target = target });
+    const zigcli_dep = b.dependency("cli", .{ .target = target });
     const zigcli_mod = zigcli_dep.module("zig-cli");
 
     const exe = b.addExecutable(.{
