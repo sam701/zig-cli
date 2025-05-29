@@ -1,4 +1,6 @@
 # ZIG-CLI
+[![Zig Docs](https://img.shields.io/badge/docs-zig-%23f7a41d)](https://sam701.github.io/zig-cli)
+
 
 A simple package for building command line apps in Zig.
 

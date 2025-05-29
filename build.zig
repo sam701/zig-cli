@@ -4,16 +4,17 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
-    const module = b.addModule("zig-cli", .{
-        .root_source_file = b.path("src/main.zig"),
-    });
-
-    const lib = b.addStaticLibrary(.{
-        .name = "zig-cli",
-        .root_source_file = b.path("src/main.zig"),
+    const lib_mod = b.createModule(.{
+        .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
+    const lib = b.addLibrary(.{
+        .linkage = .static,
+        .name = "zig-cli",
+        .root_module = lib_mod,
+    });
+
     b.installArtifact(lib);
 
     const main_tests = b.addTest(.{
@@ -31,7 +32,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("examples/simple.zig"),
         .optimize = optimize,
     });
-    simple.root_module.addImport("zig-cli", module);
+    simple.root_module.addImport("zig-cli", lib_mod);
     b.installArtifact(simple);
     b.default_step.dependOn(&simple.step);
 
@@ -41,7 +42,19 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("examples/short.zig"),
         .optimize = optimize,
     });
-    short.root_module.addImport("zig-cli", module);
+    short.root_module.addImport("zig-cli", lib_mod);
     b.installArtifact(short);
     b.default_step.dependOn(&short.step);
+
+    // Docs
+    {
+        const install_docs = b.addInstallDirectory(.{
+            .source_dir = lib.getEmittedDocs(),
+            .install_dir = .prefix,
+            .install_subdir = "docs",
+        });
+
+        const docs_step = b.step("docs", "Install docs into zig-out/docs");
+        docs_step.dependOn(&install_docs.step);
+    }
 }
