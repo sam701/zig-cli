@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void {
     });
     const lib = b.addLibrary(.{
         .linkage = .static,
-        .name = "zig-cli",
+        .name = "cli",
         .root_module = lib_mod,
     });
 
@@ -32,7 +32,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("examples/simple.zig"),
         .optimize = optimize,
     });
-    simple.root_module.addImport("zig-cli", lib_mod);
+    simple.root_module.addImport("cli", lib_mod);
     b.installArtifact(simple);
     b.default_step.dependOn(&simple.step);
 
@@ -42,7 +42,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("examples/short.zig"),
         .optimize = optimize,
     });
-    short.root_module.addImport("zig-cli", lib_mod);
+    short.root_module.addImport("cli", lib_mod);
     b.installArtifact(short);
     b.default_step.dependOn(&short.step);
 

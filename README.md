@@ -24,7 +24,7 @@ Inspired by [urfave/cli](https://github.com/urfave/cli) Go package.
 ## Usage
 ```zig
 const std = @import("std");
-const cli = @import("zig-cli");
+const cli = @import("cli");
 
 // Define a configuration structure with default values.
 var config = struct {
@@ -71,7 +71,7 @@ fn run_server() !void {
 ```
 
 ### Using with the Zig package manager
-Add `zig-cli` to your `build.zig.zon`
+Add `cli` to your `build.zig.zon`
 ```
 zig fetch --save git+https://github.com/sam701/zig-cli
 ```

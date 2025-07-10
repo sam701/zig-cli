@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const zigcli_dep = b.dependency("cli", .{ .target = target });
-    const zigcli_mod = zigcli_dep.module("zig-cli");
+    const zigcli_mod = zigcli_dep.module("cli");
 
     const exe = b.addExecutable(.{
         .name = "standalone",
@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    exe.root_module.addImport("zig-cli", zigcli_mod);
+    exe.root_module.addImport("cli", zigcli_mod);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default

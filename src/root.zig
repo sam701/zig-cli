@@ -2,7 +2,7 @@
 //!
 //! ```
 //! const std = @import("std");
-//! const cli = @import("zig-cli");
+//! const cli = @import("cli");
 //!
 //! // Define a configuration structure with default values.
 //! var config = struct {
