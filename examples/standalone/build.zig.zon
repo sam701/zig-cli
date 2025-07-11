@@ -6,8 +6,8 @@
     .dependencies = .{
         // zig fetch --save git+https://github.com/sam701/zig-cli
         .cli = .{
-            .url = "../..",
-            .hash = "cli-0.9.0-2eKe_zkBAQANlyeJwAZvm8EidDbweh34QgjMx9iVVcVa",
+            .url = "git+https://github.com/sam701/zig-cli#66aa42e7b0cfff3381f9f22a9a4bb0473f68578e",
+            .hash = "cli-0.9.0-2eKe_zUBAQAuGjFuolxsm2SkNyuMVqk4SaYrwzis5jTp",
         },
     },
 }
