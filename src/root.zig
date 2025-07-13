@@ -65,3 +65,7 @@ pub const PositionalArg = cmd.PositionalArg;
 const app_runner = @import("./app_runner.zig");
 pub const AppRunner = app_runner.AppRunner;
 pub const printError = app_runner.printError;
+
+test {
+    _ = @import("tests.zig");
+}
