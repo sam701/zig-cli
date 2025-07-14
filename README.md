@@ -83,7 +83,7 @@ See [`simple.zig`](./examples/simple.zig)
 ```
 $ ./zig-out/bin/simple sub1 --help
 USAGE:
-  abc sub1 [OPTIONS]
+  simple sub1 [OPTIONS]
 
 another awesome command
 
