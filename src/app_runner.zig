@@ -118,7 +118,14 @@ fn processError(err: parser.ParseError, err_data: parser.ErrorData, app: *const 
 
 pub fn printError(app: *const App, comptime fmt: []const u8, args: anytype) void {
     var buf: [4096]u8 = undefined;
-    var p = Printer.init(std.fs.File.stderr().writer(&buf), app.help_config.color_usage);
+    var stderr = std.fs.File.stderr();
+    var w = stderr.writer(&buf);
+    const use_color = switch (app.help_config.color_usage) {
+        .always => true,
+        .never => false,
+        .auto => std.posix.isatty(stderr.handle),
+    };
+    var p = Printer.init(&w.interface, use_color);
 
     p.printInColor(app.help_config.color_error, "ERROR");
     p.format(": ", .{});

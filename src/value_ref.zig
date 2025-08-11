@@ -109,12 +109,12 @@ const ValueList = struct {
                 return list;
             }
             fn addOne(list_ptr: *anyopaque, alloc: Allocator) Allocator.Error!*anyopaque {
-                const list: *List = @alignCast(@ptrCast(list_ptr));
+                const list: *List = @ptrCast(@alignCast(list_ptr));
                 return @ptrCast(try list.addOne(alloc));
             }
             fn finalize(list_ptr: *anyopaque, dest: *anyopaque, alloc: Allocator) Allocator.Error!void {
-                const list: *List = @alignCast(@ptrCast(list_ptr));
-                const destSlice: *[]T = @alignCast(@ptrCast(dest));
+                const list: *List = @ptrCast(@alignCast(list_ptr));
+                const destSlice: *[]T = @ptrCast(@alignCast(dest));
                 destSlice.* = try list.toOwnedSlice(alloc);
                 alloc.destroy(list);
             }

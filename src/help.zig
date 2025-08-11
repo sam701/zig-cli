@@ -19,8 +19,16 @@ pub fn print_command_help(
     const allocator = gpa.allocator();
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
+
+    const use_color = switch (global_options.color_usage) {
+        .always => true,
+        .never => false,
+        .auto => std.posix.isatty(stdout.handle),
+    };
+
     var buf: [4096]u8 = undefined;
-    var printer = Printer.init(stdout.writer(&buf), global_options.color_usage);
+    var w = stdout.writer(&buf);
+    var printer = Printer.init(&w.interface, use_color);
     defer printer.flush();
     var help_printer = HelpPrinter{
         .app = app,
