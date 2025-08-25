@@ -14,7 +14,7 @@ pub fn print_command_help(
     command_path: []const *const command.Command,
     global_options: *const GlobalOptions,
 ) !void {
-    const stdout = std.io.getStdOut();
+    const stdout = std.fs.File.stdout();
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     var arena = std.heap.ArenaAllocator.init(allocator);
