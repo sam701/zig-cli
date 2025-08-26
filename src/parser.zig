@@ -53,7 +53,7 @@ pub fn Parser(comptime Iterator: type) type {
         arena: ArenaAllocator,
         arg_iterator: Iterator,
         app: *const command.App,
-        command_path: std.ArrayList(*const command.Command),
+        command_path: std.array_list.Managed(*const command.Command),
         position_argument_ix: usize = 0,
         next_arg: ?[]const u8 = null,
         global_options: *GlobalOptions,
@@ -65,7 +65,7 @@ pub fn Parser(comptime Iterator: type) type {
                 .arena = ArenaAllocator.init(alloc),
                 .arg_iterator = it,
                 .app = app,
-                .command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16),
+                .command_path = try std.array_list.Managed(*const command.Command).initCapacity(alloc, 16),
                 .global_options = try GlobalOptions.init(app.help_config.color_usage, alloc),
             };
         }

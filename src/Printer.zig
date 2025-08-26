@@ -3,14 +3,14 @@ const command = @import("./command.zig");
 
 const Self = @This();
 
-out: std.fs.File.Writer,
+file: std.fs.File,
 use_color: bool,
 
 const color_clear = "0";
 
 pub fn init(file: std.fs.File, color: command.ColorUsage) Self {
-    return .{
-        .out = file.writer(),
+    return Self{
+        .file = file,
         .use_color = switch (color) {
             .always => true,
             .never => false,
@@ -20,7 +20,10 @@ pub fn init(file: std.fs.File, color: command.ColorUsage) Self {
 }
 
 pub inline fn write(self: *const Self, text: []const u8) void {
-    _ = self.out.write(text) catch unreachable;
+    var f = self.file.writerStreaming(&.{});
+    const out: *std.Io.Writer = &f.interface;
+
+    _ = out.writeAll(text) catch unreachable;
 }
 
 pub inline fn printNewLine(self: *const Self) void {
@@ -28,7 +31,10 @@ pub inline fn printNewLine(self: *const Self) void {
 }
 
 pub inline fn format(self: *const Self, comptime text: []const u8, args: anytype) void {
-    std.fmt.format(self.out, text, args) catch unreachable;
+    var f = self.file.writerStreaming(&.{});
+    const out: *std.Io.Writer = &f.interface;
+
+    out.print(text, args) catch unreachable;
 }
 
 pub inline fn printColor(self: *const Self, color: []const u8) void {
