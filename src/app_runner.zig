@@ -70,7 +70,7 @@ pub const AppRunner = struct {
                 const writer = &stdout.interface;
 
                 _ = writer.write("\n") catch unreachable;
-                try help.print_command_help(app, try cr.command_path.toOwnedSlice(), cr.global_options);
+                try help.print_command_help(app, try cr.command_path.toOwnedSlice(self.orig_allocator), cr.global_options);
             }
             std.posix.exit(1);
         }
