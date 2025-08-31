@@ -38,7 +38,7 @@ fn intData(comptime ValueType: type, comptime DestinationType: type) ValueData {
         .value_parser = struct {
             fn parser(dest: *anyopaque, value: []const u8, alloc: Allocator) ValueParseError!void {
                 _ = alloc;
-                const dt: *DestinationType = @alignCast(@ptrCast(dest));
+                const dt: *DestinationType = @ptrCast(@alignCast(dest));
                 dt.* = std.fmt.parseInt(ValueType, value, 10) catch return error.InvalidValue;
             }
         }.parser,

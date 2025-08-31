@@ -18,33 +18,45 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(lib);
 
     const main_tests = b.addTest(.{
-        .root_source_file = b.path("src/tests.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = lib_mod,
     });
     const run_tests = b.addRunArtifact(main_tests);
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&run_tests.step);
 
-    const simple = b.addExecutable(.{
-        .target = target,
-        .name = "simple",
-        .root_source_file = b.path("examples/simple.zig"),
-        .optimize = optimize,
-    });
-    simple.root_module.addImport("cli", lib_mod);
-    b.installArtifact(simple);
-    b.default_step.dependOn(&simple.step);
+    // Example simple
+    {
+        const simple_mod = b.addModule("simple", .{
+            .root_source_file = b.path("examples/simple.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
 
-    const short = b.addExecutable(.{
-        .target = target,
-        .name = "short",
-        .root_source_file = b.path("examples/short.zig"),
-        .optimize = optimize,
-    });
-    short.root_module.addImport("cli", lib_mod);
-    b.installArtifact(short);
-    b.default_step.dependOn(&short.step);
+        const simple = b.addExecutable(.{
+            .name = "simple",
+            .root_module = simple_mod,
+        });
+        simple.root_module.addImport("cli", lib_mod);
+        b.installArtifact(simple);
+        b.default_step.dependOn(&simple.step);
+    }
+
+    // Examples short
+    {
+        const short_mod = b.addModule("simple", .{
+            .root_source_file = b.path("examples/short.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+
+        const short = b.addExecutable(.{
+            .name = "short",
+            .root_module = short_mod,
+        });
+        short.root_module.addImport("cli", lib_mod);
+        b.installArtifact(short);
+        b.default_step.dependOn(&short.step);
+    }
 
     // Docs
     {

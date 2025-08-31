@@ -50,7 +50,7 @@ pub const AppRunner = struct {
         return self.allocSlice(command.Command, args);
     }
 
-    pub const Error = Allocator.Error;
+    pub const Error = Allocator.Error || error{WriteFailed};
 
     /// `getAction` returns the action function that should be called by the main app.
     pub fn getAction(self: *Self, app: *const App) Error!command.ExecFn {
@@ -66,8 +66,8 @@ pub const AppRunner = struct {
         } else |err| {
             processError(err, cr.error_data orelse unreachable, app);
             if (app.help_config.print_help_on_error) {
-                _ = std.io.getStdOut().write("\n") catch unreachable;
-                try help.print_command_help(app, try cr.command_path.toOwnedSlice(), cr.global_options);
+                _ = std.fs.File.stdout().write("\n") catch unreachable;
+                try help.print_command_help(app, try cr.command_path.toOwnedSlice(self.orig_allocator), cr.global_options);
             }
             std.posix.exit(1);
         }
@@ -117,7 +117,15 @@ fn processError(err: parser.ParseError, err_data: parser.ErrorData, app: *const 
 }
 
 pub fn printError(app: *const App, comptime fmt: []const u8, args: anytype) void {
-    var p = Printer.init(std.io.getStdErr(), app.help_config.color_usage);
+    var buf: [4096]u8 = undefined;
+    var stderr = std.fs.File.stderr();
+    var w = stderr.writer(&buf);
+    const use_color = switch (app.help_config.color_usage) {
+        .always => true,
+        .never => false,
+        .auto => std.posix.isatty(stderr.handle),
+    };
+    var p = Printer.init(&w.interface, use_color);
 
     p.printInColor(app.help_config.color_error, "ERROR");
     p.format(": ", .{});

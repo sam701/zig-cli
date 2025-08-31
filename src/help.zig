@@ -14,17 +14,28 @@ pub fn print_command_help(
     command_path: []const *const command.Command,
     global_options: *const GlobalOptions,
 ) !void {
-    const stdout = std.io.getStdOut();
+    const stdout: std.fs.File = .stdout();
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
+    const use_color = switch (global_options.color_usage) {
+        .always => true,
+        .never => false,
+        .auto => std.posix.isatty(stdout.handle),
+    };
+
+    var buf: [4096]u8 = undefined;
+    var w = stdout.writer(&buf);
+    var printer = Printer.init(&w.interface, use_color);
+    defer printer.flush();
     var help_printer = HelpPrinter{
         .app = app,
-        .printer = Printer.init(stdout, global_options.color_usage),
+        .printer = &printer,
         .global_options = global_options,
         .allocator = arena.allocator(),
     };
-    defer arena.deinit();
 
     if (command_path.len == 1) {
         help_printer.printAppHelp(app, command_path);
@@ -35,7 +46,7 @@ pub fn print_command_help(
 
 const HelpPrinter = struct {
     app: *const command.App,
-    printer: Printer,
+    printer: *Printer,
     global_options: *const GlobalOptions,
     allocator: Allocator,
 
@@ -171,7 +182,7 @@ const HelpPrinter = struct {
         }
     }
 
-    fn printOption(self: *const HelpPrinter, option: *const command.Option, option_column_width: usize) void {
+    fn printOption(self: *HelpPrinter, option: *const command.Option, option_column_width: usize) void {
         if (option.short_alias) |alias| {
             self.printer.printSpaces(2);
             self.printer.printColor(self.app.help_config.color_option);

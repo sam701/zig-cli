@@ -73,9 +73,12 @@ fn run_server() !void {
 ### Using with the Zig package manager
 Add `cli` to your `build.zig.zon`
 ```
+# For zig 0.14.x
 zig fetch --save git+https://github.com/sam701/zig-cli
+
+# For zig master
+zig fetch --save git+https://github.com/sam701/zig-cli#zig-0.15
 ```
-See the [`standalone`](./examples/standalone) example in the `examples` folder.
 
 ## Printing help
 See [`simple.zig`](./examples/simple.zig)
