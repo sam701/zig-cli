@@ -67,7 +67,7 @@ pub const AppRunner = struct {
             processError(err, cr.error_data orelse unreachable, app);
             if (app.help_config.print_help_on_error) {
                 _ = std.fs.File.stdout().write("\n") catch unreachable;
-                try help.print_command_help(app, try cr.command_path.toOwnedSlice(), cr.global_options);
+                try help.print_command_help(app, try cr.command_path.toOwnedSlice(self.orig_allocator), cr.global_options);
             }
             std.posix.exit(1);
         }

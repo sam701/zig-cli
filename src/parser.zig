@@ -71,7 +71,7 @@ pub fn Parser(comptime Iterator: type) type {
         }
 
         pub fn deinit(self: *Self) void {
-            self.command_path.deinit();
+            self.command_path.deinit(self.orig_allocator);
             self.global_options.deinit();
             self.arena.deinit();
         }
@@ -81,7 +81,7 @@ pub fn Parser(comptime Iterator: type) type {
         }
 
         pub fn parse(self: *Self) ParseError!ParseResult {
-            try self.command_path.append(&self.app.command);
+            try self.command_path.append(self.orig_allocator, &self.app.command);
 
             // TODO: run all options once before the main run to check if --help is present
 
@@ -212,7 +212,7 @@ pub fn Parser(comptime Iterator: type) type {
                         .subcommands => |cmds| {
                             for (cmds) |*sc| {
                                 if (std.mem.eql(u8, sc.name, some_name)) {
-                                    try self.command_path.append(sc);
+                                    try self.command_path.append(self.orig_allocator, sc);
                                     return false;
                                 }
                             }
@@ -255,7 +255,7 @@ pub fn Parser(comptime Iterator: type) type {
             };
 
             if (opt == self.global_options.option_show_help) {
-                try help.print_command_help(self.app, try self.command_path.toOwnedSlice(), self.global_options);
+                try help.print_command_help(self.app, try self.command_path.toOwnedSlice(self.orig_allocator), self.global_options);
                 std.posix.exit(0);
             }
 
