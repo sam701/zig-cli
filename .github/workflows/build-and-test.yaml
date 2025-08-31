@@ -7,14 +7,17 @@ on:
   schedule:
     - cron: 0 4 * * *
 
+env:
+  zig_version: 0.15.1
+
 jobs:
-  test-with-zig-master:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: goto-bus-stop/setup-zig@v2
+      - uses: mlugg/setup-zig@v2
         with:
-          version: master
+          version: ${{ env.zig_version }}
       - run: zig fmt --check *.zig src/*.zig
       - run: zig build
       - run: zig build test
@@ -29,15 +32,15 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: goto-bus-stop/setup-zig@v2
+      - uses: mlugg/setup-zig@v2
         with:
-          version: master
+          version: ${{ env.zig_version }}
       - run: zig build
       - run: zig build test
 
   deploy-pages:
     runs-on: ubuntu-latest
-    needs: test-with-zig-master
+    needs: build-and-test
     if: github.ref == 'refs/heads/main' && github.event_name != 'schedule'
     permissions:
       pages: write      # to deploy to Pages
