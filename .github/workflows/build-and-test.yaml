@@ -6,7 +6,7 @@ on:
     - cron: 0 4 * * *
 
 env:
-  zig_version: 0.15.1
+  zig_version: master
 
 jobs:
   build-and-test-linux:
