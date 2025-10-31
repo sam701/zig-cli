@@ -159,24 +159,75 @@ const HelpPrinter = struct {
             },
         }
 
+        // Print options grouped by where they are defined: command (parent),
+        // subcommands (each under its own heading) and global options.
         self.printer.printInColor(self.app.help_config.color_section, "\nOPTIONS:\n");
         var option_column_width: usize = 7;
+
+        // Consider parent command options
         if (cmd.options) |option_list| {
             for (option_list) |option| {
                 const w = option.long_name.len + option.value_name.len + 3;
                 option_column_width = @max(option_column_width, w);
             }
         }
+
+        // Consider global options
         for (self.global_options.options) |option| {
             const w = option.long_name.len + option.value_name.len + 3;
             option_column_width = @max(option_column_width, w);
         }
+
+        // If this command has subcommands, include their options when
+        // calculating width so columns align nicely, and later print them
+        // grouped under their command name.
+        switch (cmd.target) {
+            .subcommands => |sc_list| {
+                for (sc_list) |sc| {
+                    if (sc.options) |olist| {
+                        for (olist) |option| {
+                            const w = option.long_name.len + option.value_name.len + 3;
+                            option_column_width = @max(option_column_width, w);
+                        }
+                    }
+                }
+            },
+            .action => {},
+        }
+
         option_column_width += 3;
+
+        // Print parent command options first (if any)
         if (cmd.options) |option_list| {
             for (option_list) |*option| {
                 self.printOption(option, option_column_width);
             }
         }
+
+        // If there are subcommands, print each subcommand's options under a
+        // short heading so options are grouped by the command where they're
+        // defined (rather than all mixed together).
+        switch (cmd.target) {
+            .subcommands => |sc_list| {
+                for (sc_list) |sc| {
+                    // Print a small header for the subcommand
+                    self.printer.printNewLine();
+                    self.printer.printColor(self.app.help_config.color_option);
+                    self.printer.format("  {s}:", .{sc.name});
+                    self.printer.printColor(color_clear);
+                    self.printer.printNewLine();
+
+                    if (sc.options) |olist| {
+                        for (olist) |*option| {
+                            self.printOption(option, option_column_width);
+                        }
+                    }
+                }
+            },
+            .action => {},
+        }
+
+        // Finally print global options
         for (self.global_options.options) |option| {
             self.printOption(option, option_column_width);
         }
