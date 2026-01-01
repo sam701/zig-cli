@@ -22,13 +22,14 @@ const StringSliceIterator = struct {
 };
 
 fn runner() AppRunner {
-    return AppRunner.init(alloc) catch unreachable;
+    return AppRunner.init(std.testing.io, alloc) catch unreachable;
 }
 
 fn run(app: *const command.App, items: []const []const u8) !void {
     var parser = try Parser(StringSliceIterator).init(
         app,
         StringSliceIterator{ .items = items },
+        std.testing.io,
         alloc,
     );
     defer parser.deinit();

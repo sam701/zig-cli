@@ -8,10 +8,10 @@ use_color: bool,
 
 const color_clear = "0";
 
-pub fn init(writer: *std.Io.Writer, use_color: bool) Self {
+pub fn init(writer: *std.Io.File.Writer) Self {
     return .{
-        .writer = writer,
-        .use_color = use_color,
+        .writer = &writer.interface,
+        .use_color = writer.file.isTty(writer.io) catch unreachable,
     };
 }
 

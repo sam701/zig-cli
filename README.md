@@ -33,7 +33,9 @@ var config = struct {
 }{};
 
 pub fn main() !void {
-    var r = try cli.AppRunner.init(std.heap.page_allocator);
+    var threaded = std.Io.Threaded.init(std.heap.page_allocator, .{});
+    defer threaded.deinit();
+    var r = try cli.AppRunner.init(threaded.io(), std.heap.page_allocator);
 
     // Create an App with a command named "short" that takes host and port options.
     const app = cli.App{

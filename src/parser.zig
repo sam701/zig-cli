@@ -59,10 +59,13 @@ pub fn Parser(comptime Iterator: type) type {
         global_options: *GlobalOptions,
         error_data: ?ErrorData = null,
 
-        pub fn init(app: *const command.App, it: Iterator, alloc: Allocator) !Self {
+        io: std.Io,
+
+        pub fn init(app: *const command.App, it: Iterator, io: std.Io, alloc: Allocator) !Self {
             return .{
                 .orig_allocator = alloc,
                 .arena = ArenaAllocator.init(alloc),
+                .io = io,
                 .arg_iterator = it,
                 .app = app,
                 .command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16),
@@ -255,8 +258,11 @@ pub fn Parser(comptime Iterator: type) type {
             };
 
             if (opt == self.global_options.option_show_help) {
-                try help.print_command_help(self.app, try self.command_path.toOwnedSlice(self.orig_allocator), self.global_options);
-                std.posix.exit(0);
+                var buf: [4096]u8 = undefined;
+                var writer = std.Io.File.stdout().writer(self.io, &buf);
+                var printer = Printer.init(&writer);
+                try help.print_command_help(&printer, self.app, try self.command_path.toOwnedSlice(self.orig_allocator), self.global_options);
+                std.process.exit(0);
             }
 
             if (opt.value_ref.value_data.is_bool) {

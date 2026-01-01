@@ -11,17 +11,19 @@ const command = @import("command.zig");
 const help = @import("./help.zig");
 
 pub const AppRunner = struct {
-    // This arena and its allocator is intended to be used only for the value references
-    // that must be freed after the parsing is finished.
-    // For everything else the original allocator.
+    // Arena allocator for temporary data during parsing (ValueRefs, argument slices, etc.)
+    // that is freed immediately after parsing completes.
+    // The original allocator is used for data that outlives the parsing phase.
     arena: ArenaAllocator,
     orig_allocator: Allocator,
+    io: std.Io,
 
     const Self = @This();
-    pub fn init(alloc: Allocator) !Self {
+    pub fn init(io: std.Io, alloc: Allocator) !Self {
         return .{
             .arena = ArenaAllocator.init(alloc),
             .orig_allocator = alloc,
+            .io = io,
         };
     }
 
@@ -57,19 +59,22 @@ pub const AppRunner = struct {
         const iter = try std.process.argsWithAllocator(self.arena.allocator());
 
         // Here we pass the child allocator because any values allocated on the client behalf may not be freed.
-        var cr = try Parser(std.process.ArgIterator).init(app, iter, self.orig_allocator);
+        var cr = try Parser(std.process.ArgIterator).init(app, iter, self.io, self.orig_allocator);
         defer cr.deinit();
 
         if (cr.parse()) |action| {
             self.deinit();
             return action;
         } else |err| {
-            processError(err, cr.error_data orelse unreachable, app);
+            var buffer: [4096]u8 = undefined;
+            var w = std.Io.File.stderr().writer(self.io, &buffer);
+            var printer = Printer.init(&w);
+            processError(&printer, err, cr.error_data orelse unreachable, app);
             if (app.help_config.print_help_on_error) {
-                _ = std.fs.File.stdout().write("\n") catch unreachable;
-                try help.print_command_help(app, try cr.command_path.toOwnedSlice(self.orig_allocator), cr.global_options);
+                printer.printNewLine();
+                try help.print_command_help(&printer, app, try cr.command_path.toOwnedSlice(self.orig_allocator), cr.global_options);
             }
-            std.posix.exit(1);
+            std.process.exit(1);
         }
     }
 
@@ -83,21 +88,22 @@ pub const AppRunner = struct {
     }
 };
 
-fn processError(err: parser.ParseError, err_data: parser.ErrorData, app: *const App) void {
+fn processError(p: *Printer, err: parser.ParseError, err_data: parser.ErrorData, app: *const App) void {
     switch (err) {
-        error.UnknownOption => printError(app, "unknown option '--{s}'", .{err_data.provided_string}),
-        error.UnknownOptionAlias => printError(app, "unknown option alias '-{c}'", .{err_data.option_alias}),
-        error.UnknownSubcommand => printError(app, "unknown subcommand '{s}'", .{err_data.provided_string}),
-        error.MissingRequiredOption => printError(app, "missing required option '--{s}'", .{err_data.entity_name}),
-        error.MissingRequiredPositionalArgument => printError(app, "missing required positional argument '{s}'", .{err_data.entity_name}),
-        error.MissingSubcommand => printError(app, "command '{s}' requires subcommand", .{err_data.entity_name}),
-        error.MissingOptionValue => printError(app, "option ('--{s}') requires value", .{err_data.entity_name}),
-        error.UnexpectedPositionalArgument => printError(app, "unexpected positional argument '{s}'", .{err_data.provided_string}),
-        error.CommandDoesNotHavePositionalArguments => printError(app, "command '{s}' does not have positional arguments", .{err_data.entity_name}),
+        error.UnknownOption => printError(p, app, "unknown option '--{s}'", .{err_data.provided_string}),
+        error.UnknownOptionAlias => printError(p, app, "unknown option alias '-{c}'", .{err_data.option_alias}),
+        error.UnknownSubcommand => printError(p, app, "unknown subcommand '{s}'", .{err_data.provided_string}),
+        error.MissingRequiredOption => printError(p, app, "missing required option '--{s}'", .{err_data.entity_name}),
+        error.MissingRequiredPositionalArgument => printError(p, app, "missing required positional argument '{s}'", .{err_data.entity_name}),
+        error.MissingSubcommand => printError(p, app, "command '{s}' requires subcommand", .{err_data.entity_name}),
+        error.MissingOptionValue => printError(p, app, "option ('--{s}') requires value", .{err_data.entity_name}),
+        error.UnexpectedPositionalArgument => printError(p, app, "unexpected positional argument '{s}'", .{err_data.provided_string}),
+        error.CommandDoesNotHavePositionalArguments => printError(p, app, "command '{s}' does not have positional arguments", .{err_data.entity_name}),
         error.InvalidValue => {
             const iv = err_data.invalid_value;
             if (iv.envvar) |ev| {
                 printError(
+                    p,
                     app,
                     "failed to parse '{s}' (read from envvar {s}) as the value for option '--{s}' which is of type {s}",
                     .{ iv.provided_string, ev, iv.entity_name, iv.value_type },
@@ -106,27 +112,18 @@ fn processError(err: parser.ParseError, err_data: parser.ErrorData, app: *const 
                 const et = if (iv.entity_type == .option) "option" else "positional argument";
                 const px = if (iv.entity_type == .option) "--" else "";
                 printError(
+                    p,
                     app,
                     "failed to parse '{s}' as the value for {s} '{s}{s}' which is of type {s}",
                     .{ iv.provided_string, et, px, iv.entity_name, iv.value_type },
                 );
             }
         },
-        error.OutOfMemory => printError(app, "out of memory", .{}),
+        error.OutOfMemory => printError(p, app, "out of memory", .{}),
     }
 }
 
-pub fn printError(app: *const App, comptime fmt: []const u8, args: anytype) void {
-    var buf: [4096]u8 = undefined;
-    var stderr = std.fs.File.stderr();
-    var w = stderr.writer(&buf);
-    const use_color = switch (app.help_config.color_usage) {
-        .always => true,
-        .never => false,
-        .auto => std.posix.isatty(stderr.handle),
-    };
-    var p = Printer.init(&w.interface, use_color);
-
+pub fn printError(p: *Printer, app: *const App, comptime fmt: []const u8, args: anytype) void {
     p.printInColor(app.help_config.color_error, "ERROR");
     p.format(": ", .{});
     p.format(fmt, args);

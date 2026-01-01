@@ -10,29 +10,20 @@ const Allocator = std.mem.Allocator;
 const color_clear = "0";
 
 pub fn print_command_help(
+    printer: *Printer,
     app: *const command.App,
     command_path: []const *const command.Command,
     global_options: *const GlobalOptions,
 ) !void {
-    const stdout: std.fs.File = .stdout();
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    const use_color = switch (global_options.color_usage) {
-        .always => true,
-        .never => false,
-        .auto => std.posix.isatty(stdout.handle),
-    };
-
-    var buf: [4096]u8 = undefined;
-    var w = stdout.writer(&buf);
-    var printer = Printer.init(&w.interface, use_color);
     defer printer.flush();
     var help_printer = HelpPrinter{
         .app = app,
-        .printer = &printer,
+        .printer = printer,
         .global_options = global_options,
         .allocator = arena.allocator(),
     };

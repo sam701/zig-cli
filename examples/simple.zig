@@ -52,9 +52,9 @@ fn sub3(r: *cli.AppRunner) !cli.Command {
     };
 }
 
-fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
+fn parseArgs(io: std.Io) cli.AppRunner.Error!cli.ExecFn {
     // This allocator will be used to allocate config.ip and config.arg2.
-    var r = try cli.AppRunner.init(allocator);
+    var r = try cli.AppRunner.init(io, allocator);
 
     const sub2 = cli.Command{
         .name = "sub2",
@@ -130,7 +130,10 @@ fn parseArgs() cli.AppRunner.Error!cli.ExecFn {
 }
 
 pub fn main() anyerror!void {
-    const action = try parseArgs();
+    var threaded = std.Io.Threaded.init(std.heap.page_allocator, .{});
+    defer threaded.deinit();
+
+    const action = try parseArgs(threaded.io());
     const r = action();
     freeConfig();
     return r;
