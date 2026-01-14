@@ -22,6 +22,7 @@ Inspired by [urfave/cli](https://github.com/urfave/cli) Go package.
 * colored help messages when TTY is attached
 
 ## Usage
+[API Documentation](https://sam701.github.io/zig-cli)
 ```zig
 const std = @import("std");
 const cli = @import("cli");

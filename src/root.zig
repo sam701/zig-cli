@@ -10,8 +10,8 @@
 //!     port: u16 = undefined,
 //! }{};
 //!
-//! pub fn main() !void {
-//!     var r = try cli.AppRunner.init(std.heap.page_allocator);
+//! pub fn main(init: std.process.Init) !void {
+//!     var r = cli.AppRunner.init(&init);
 //!
 //!     // Create an App with a command named "short" that takes host and port options.
 //!     const app = cli.App{
