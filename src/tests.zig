@@ -6,9 +6,11 @@ const ppack = @import("./parser.zig");
 const Parser = ppack.Parser;
 const ParseResult = ppack.ParseResult;
 const AppRunner = @import("app_runner.zig").AppRunner;
+const value_ref = @import("value_ref.zig");
 
 const expect = std.testing.expect;
 const alloc = std.testing.allocator;
+const environ = std.process.Environ.Map.init(alloc);
 const expectError = std.testing.expectError;
 
 const StringSliceIterator = struct {
@@ -21,8 +23,22 @@ const StringSliceIterator = struct {
     }
 };
 
-fn runner() AppRunner {
-    return AppRunner.init(std.testing.io, alloc) catch unreachable;
+const MockedAppRunner = struct {
+    arena: std.heap.ArenaAllocator,
+
+    pub fn deinit(self: *MockedAppRunner) void {
+        self.arena.deinit();
+    }
+
+    pub fn mkRef(self: *MockedAppRunner, dest: anytype) *value_ref.ValueRef {
+        return value_ref.allocRef(dest, self.arena.allocator());
+    }
+};
+
+fn runner() MockedAppRunner {
+    return .{
+        .arena = std.heap.ArenaAllocator.init(alloc),
+    };
 }
 
 fn run(app: *const command.App, items: []const []const u8) !void {
@@ -31,6 +47,7 @@ fn run(app: *const command.App, items: []const []const u8) !void {
         StringSliceIterator{ .items = items },
         std.testing.io,
         alloc,
+        &environ,
     );
     defer parser.deinit();
     _ = try parser.parse();

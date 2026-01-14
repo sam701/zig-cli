@@ -7,10 +7,8 @@ var config = struct {
     port: u16 = undefined,
 }{};
 
-pub fn main() !void {
-    var threaded = std.Io.Threaded.init(std.heap.page_allocator, .{});
-    defer threaded.deinit();
-    var r = try cli.AppRunner.init(threaded.io(), std.heap.page_allocator);
+pub fn main(init: std.process.Init) !void {
+    var r = cli.AppRunner.init(&init);
 
     // Create an App with a command named "short" that takes host and port options.
     const app = cli.App{

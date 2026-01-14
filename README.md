@@ -32,10 +32,8 @@ var config = struct {
     port: u16 = undefined,
 }{};
 
-pub fn main() !void {
-    var threaded = std.Io.Threaded.init(std.heap.page_allocator, .{});
-    defer threaded.deinit();
-    var r = try cli.AppRunner.init(threaded.io(), std.heap.page_allocator);
+pub fn main(init: std.process.Init) !void {
+    var r = cli.AppRunner.init(&init);
 
     // Create an App with a command named "short" that takes host and port options.
     const app = cli.App{
@@ -75,10 +73,10 @@ fn run_server() !void {
 ### Using with the Zig package manager
 Add `cli` to your `build.zig.zon`
 ```
-# For zig 0.14.x
+# For zig master
 zig fetch --save git+https://github.com/sam701/zig-cli
 
-# For zig master
+# For zig 0.15
 zig fetch --save git+https://github.com/sam701/zig-cli#zig-0.15
 ```
 

@@ -60,12 +60,14 @@ pub fn Parser(comptime Iterator: type) type {
         error_data: ?ErrorData = null,
 
         io: std.Io,
+        environ: *const std.process.Environ.Map,
 
-        pub fn init(app: *const command.App, it: Iterator, io: std.Io, alloc: Allocator) !Self {
+        pub fn init(app: *const command.App, it: Iterator, io: std.Io, alloc: Allocator, environ: *const std.process.Environ.Map) !Self {
             return .{
                 .orig_allocator = alloc,
                 .arena = ArenaAllocator.init(alloc),
                 .io = io,
+                .environ = environ,
                 .arg_iterator = it,
                 .app = app,
                 .command_path = try std.ArrayList(*const command.Command).initCapacity(alloc, 16),
@@ -190,7 +192,7 @@ pub fn Parser(comptime Iterator: type) type {
             if (opt.value_ref.element_count > 0) return;
 
             if (try getEnvvarName(opt, self.app.option_envvar_prefix, self.arena.allocator())) |envvar_name| {
-                if (std.process.getEnvVarOwned(self.arena.allocator(), envvar_name)) |value| {
+                if (self.environ.get(envvar_name)) |value| {
                     opt.value_ref.put(value, self.orig_allocator) catch |err| {
                         self.error_data = ErrorData{ .invalid_value = .{
                             .entity_type = .option,
@@ -201,7 +203,7 @@ pub fn Parser(comptime Iterator: type) type {
                         } };
                         return err;
                     };
-                } else |_| {}
+                }
             }
         }
 

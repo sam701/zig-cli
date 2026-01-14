@@ -1,9 +1,6 @@
 const std = @import("std");
 const cli = @import("cli");
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-const allocator = gpa.allocator();
-
 var config = struct {
     ip: []const u8 = undefined,
     int: i32 = undefined,
@@ -52,9 +49,9 @@ fn sub3(r: *cli.AppRunner) !cli.Command {
     };
 }
 
-fn parseArgs(io: std.Io) cli.AppRunner.Error!cli.ExecFn {
+fn parseArgs(init: *const std.process.Init) cli.AppRunner.Error!cli.ExecFn {
     // This allocator will be used to allocate config.ip and config.arg2.
-    var r = try cli.AppRunner.init(io, allocator);
+    var r = cli.AppRunner.init(init);
 
     const sub2 = cli.Command{
         .name = "sub2",
@@ -129,30 +126,9 @@ fn parseArgs(io: std.Io) cli.AppRunner.Error!cli.ExecFn {
     return r.getAction(&app);
 }
 
-pub fn main() anyerror!void {
-    var threaded = std.Io.Threaded.init(std.heap.page_allocator, .{});
-    defer threaded.deinit();
-
-    const action = try parseArgs(threaded.io());
-    const r = action();
-    freeConfig();
-    return r;
-}
-
-// Usually, you just use an arena allocator to free all allocated resources in a batch.
-// This only illustrates the fact that the config data are allocated with the allocator
-// you pass to cli.AppRunner.init(allocator).
-fn freeConfig() void {
-    allocator.free(config.ip);
-    if (config.arg2.len > 0) {
-        for (config.arg2) |item| {
-            allocator.free(item);
-        }
-        allocator.free(config.arg2);
-    }
-    if (gpa.deinit() == .leak) {
-        @panic("config leaked");
-    }
+pub fn main(init: std.process.Init) anyerror!void {
+    const action = try parseArgs(&init);
+    return action();
 }
 
 fn run_sub3() !void {

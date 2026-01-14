@@ -17,13 +17,17 @@ pub const AppRunner = struct {
     arena: ArenaAllocator,
     orig_allocator: Allocator,
     io: std.Io,
+    environ: *const std.process.Environ.Map,
+    args: *const std.process.Args,
 
     const Self = @This();
-    pub fn init(io: std.Io, alloc: Allocator) !Self {
+    pub fn init(orig_init: *const std.process.Init) Self {
         return .{
-            .arena = ArenaAllocator.init(alloc),
-            .orig_allocator = alloc,
-            .io = io,
+            .arena = ArenaAllocator.init(orig_init.gpa),
+            .orig_allocator = orig_init.gpa,
+            .io = orig_init.io,
+            .environ = orig_init.environ_map,
+            .args = &orig_init.minimal.args,
         };
     }
 
@@ -56,10 +60,10 @@ pub const AppRunner = struct {
 
     /// `getAction` returns the action function that should be called by the main app.
     pub fn getAction(self: *Self, app: *const App) Error!command.ExecFn {
-        const iter = try std.process.argsWithAllocator(self.arena.allocator());
+        const iter = try self.args.iterateAllocator(self.arena.allocator());
 
         // Here we pass the child allocator because any values allocated on the client behalf may not be freed.
-        var cr = try Parser(std.process.ArgIterator).init(app, iter, self.io, self.orig_allocator);
+        var cr = try Parser(std.process.Args.Iterator).init(app, iter, self.io, self.orig_allocator, self.environ);
         defer cr.deinit();
 
         if (cr.parse()) |action| {
