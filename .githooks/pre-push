@@ -4,6 +4,7 @@ set -e
 
 echo "Running tests before push..."
 
+exit 1
 zig fmt --check *.zig src/*.zig
 zig build
 zig build test
