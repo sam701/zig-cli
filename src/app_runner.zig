@@ -10,12 +10,13 @@ const Printer = @import("Printer.zig");
 const command = @import("command.zig");
 const help = @import("./help.zig");
 
+/// Owns all memory allocated during argument parsing and action setup.
+/// Call `deinit` to free everything at once (typically via `defer r.deinit()`).
 pub const AppRunner = struct {
-    // Arena allocator for temporary data during parsing (ValueRefs, argument slices, etc.)
-    // that is freed immediately after parsing completes.
-    // The original allocator is used for data that outlives the parsing phase.
+    /// Arena that backs all allocations made by this runner, including parsed values
+    /// that outlive `getAction`. Publicly accessible so callers can allocate additional
+    /// data with the same lifetime and have it freed together on `deinit`.
     arena: ArenaAllocator,
-    orig_allocator: Allocator,
     io: std.Io,
     environ: *const std.process.Environ.Map,
     args: *const std.process.Args,
@@ -24,7 +25,6 @@ pub const AppRunner = struct {
     pub fn init(orig_init: *const std.process.Init) Self {
         return .{
             .arena = ArenaAllocator.init(orig_init.gpa),
-            .orig_allocator = orig_init.gpa,
             .io = orig_init.io,
             .environ = orig_init.environ_map,
             .args = &orig_init.minimal.args,
@@ -63,11 +63,10 @@ pub const AppRunner = struct {
         const iter = try self.args.iterateAllocator(self.arena.allocator());
 
         // Here we pass the child allocator because any values allocated on the client behalf may not be freed.
-        var cr = try Parser(std.process.Args.Iterator).init(app, iter, self.io, self.orig_allocator, self.environ);
+        var cr = try Parser(std.process.Args.Iterator).init(app, iter, self.io, self.arena.allocator(), self.environ);
         defer cr.deinit();
 
         if (cr.parse()) |action| {
-            self.deinit();
             return action;
         } else |err| {
             var buffer: [4096]u8 = undefined;
@@ -79,9 +78,9 @@ pub const AppRunner = struct {
                 try help.print_command_help(
                     &printer,
                     app,
-                    try cr.command_path.toOwnedSlice(self.orig_allocator),
+                    try cr.command_path.toOwnedSlice(self.arena.allocator()),
                     cr.global_options,
-                    self.orig_allocator,
+                    self.arena.allocator(),
                 );
             }
             std.process.exit(1);

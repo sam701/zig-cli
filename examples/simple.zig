@@ -49,10 +49,7 @@ fn sub3(r: *cli.AppRunner) !cli.Command {
     };
 }
 
-fn parseArgs(init: *const std.process.Init) cli.AppRunner.Error!cli.ExecFn {
-    // This allocator will be used to allocate config.ip and config.arg2.
-    var r = cli.AppRunner.init(init);
-
+fn parseArgs(r: *cli.AppRunner) cli.AppRunner.Error!cli.ExecFn {
     const sub2 = cli.Command{
         .name = "sub2",
         .target = cli.CommandTarget{
@@ -62,10 +59,9 @@ fn parseArgs(init: *const std.process.Init) cli.AppRunner.Error!cli.ExecFn {
         },
     };
 
-    // Since we call r.getAction in this fuction, all r.alloc* invocation are unnecessary.
-    // We can directly pass slices of commands, options, and posititional arguments,
+    // Since we call r.getAction in this function, all r.alloc* invocation are unnecessary.
+    // We can directly pass slices of commands, options, and positional arguments,
     // like `.options = &.{....}`
-
     const app = cli.App{
         .option_envvar_prefix = "CLI_",
         .command = cli.Command{
@@ -113,7 +109,7 @@ fn parseArgs(init: *const std.process.Init) cli.AppRunner.Error!cli.ExecFn {
                             },
                         }),
                         .target = cli.CommandTarget{
-                            .subcommands = try r.allocCommands(&.{ sub2, try sub3(&r) }),
+                            .subcommands = try r.allocCommands(&.{ sub2, try sub3(r) }),
                         },
                     },
                 }),
@@ -127,20 +123,23 @@ fn parseArgs(init: *const std.process.Init) cli.AppRunner.Error!cli.ExecFn {
 }
 
 pub fn main(init: std.process.Init) anyerror!void {
-    const action = try parseArgs(&init);
+    var r = cli.AppRunner.init(&init);
+    defer r.deinit();
+
+    const action = try parseArgs(&r);
     return action();
 }
 
 fn run_sub3() !void {
     const c = &config;
-    std.log.debug("int: {}", .{c.int});
-    std.log.debug("sub3: arg1: {}", .{c.arg1});
+    std.log.info("int: {}", .{c.int});
+    std.log.info("sub3: arg1: {}", .{c.arg1});
     for (c.arg2) |arg| {
-        std.log.debug("sub3: arg2: {s}", .{arg});
+        std.log.info("sub3: arg2: {s}", .{arg});
     }
 }
 
 fn run_sub2() !void {
     const c = &config;
-    std.log.debug("running sub2: ip={s}, bool={any}, float={any}", .{ c.ip, c.bool, c.float });
+    std.log.info("running sub2: ip={s}, bool={any}, float={any}", .{ c.ip, c.bool, c.float });
 }

@@ -1,7 +1,6 @@
 const std = @import("std");
 const cli = @import("cli");
 
-// Define a configuration structure with default values.
 var config = struct {
     host: []const u8 = "localhost",
     port: u16 = undefined,
@@ -9,20 +8,17 @@ var config = struct {
 
 pub fn main(init: std.process.Init) !void {
     var r = cli.AppRunner.init(&init);
+    defer r.deinit();
 
-    // Create an App with a command named "short" that takes host and port options.
     const app = cli.App{
         .command = cli.Command{
-            .name = "short",
+            .name = "server",
             .options = try r.allocOptions(&.{
-                // Define an Option for the "host" command-line argument.
                 .{
                     .long_name = "host",
                     .help = "host to listen on",
                     .value_ref = r.mkRef(&config.host),
                 },
-
-                // Define an Option for the "port" command-line argument.
                 .{
                     .long_name = "port",
                     .help = "port to bind to",
@@ -31,15 +27,13 @@ pub fn main(init: std.process.Init) !void {
                 },
             }),
             .target = cli.CommandTarget{
-                .action = cli.CommandAction{ .exec = run_server },
+                .action = cli.CommandAction{ .exec = run },
             },
         },
     };
     return r.run(&app);
 }
 
-// Action function to execute when the "short" command is invoked.
-fn run_server() !void {
-    // Log a debug message indicating the server is listening on the specified host and port.
-    std.log.debug("server is listening on {s}:{d}", .{ config.host, config.port });
+fn run() !void {
+    std.log.info("listening on {s}:{d}", .{ config.host, config.port });
 }
