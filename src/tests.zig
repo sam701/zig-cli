@@ -382,6 +382,33 @@ test "missing subcommand" {
     try expectError(error.CommandDoesNotHavePositionalArguments, run(&app, &.{ "abc", "--", "3" }));
 }
 
+test "command aliases" {
+    var r = runner();
+    defer r.deinit();
+
+    const app = command.App{
+        .command = command.Command{
+            .name = "abc",
+            .target = command.CommandTarget{
+                .subcommands = &.{
+                    command.Command{
+                        .name = "subcommand",
+                        .aliases = &.{ "sub", "su" },
+                        .target = command.CommandTarget{
+                            .action = .{ .exec = dummy_action },
+                        },
+                    },
+                },
+            },
+        },
+    };
+
+    try run(&app, &.{ "abc", "subcommand" });
+    try run(&app, &.{ "abc", "sub" });
+    try run(&app, &.{ "abc", "su" });
+    try expectError(error.UnknownSubcommand, run(&app, &.{ "abc", "bad" }));
+}
+
 test "missing required option" {
     var r = runner();
     defer r.deinit();

@@ -46,6 +46,8 @@ pub const Command = struct {
     name: []const u8,
     /// Description of the command.
     description: ?Description = null,
+    /// Command aliases
+    aliases: ?[]const []const u8 = null,
     /// List of options for the command.
     options: ?[]const Option = null,
     /// Target of the command (subcommands or action).

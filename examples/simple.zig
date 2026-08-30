@@ -51,7 +51,11 @@ fn sub3(r: *cli.AppRunner) !cli.Command {
 
 fn parseArgs(r: *cli.AppRunner) cli.AppRunner.Error!cli.ExecFn {
     const sub2 = cli.Command{
-        .name = "sub2",
+        .name = "subcommand2",
+        .aliases = &.{ "s2", "sub2" },
+        .description = cli.Description{
+            .one_line = "dummy2",
+        },
         .target = cli.CommandTarget{
             .action = cli.CommandAction{
                 .exec = run_sub2,

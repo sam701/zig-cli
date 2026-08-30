@@ -128,16 +128,22 @@ const HelpPrinter = struct {
 
                 var max_cmd_width: usize = 0;
                 for (sc_list) |sc| {
-                    max_cmd_width = @max(max_cmd_width, sc.name.len);
+                    max_cmd_width = @max(max_cmd_width, commandTextLen(&sc));
                 }
                 const cmd_column_width = max_cmd_width + 3;
                 for (sc_list) |sc| {
                     self.printer.printColor(self.app.help_config.color_option);
                     self.printer.format("  {s}", .{sc.name});
+                    if (sc.aliases) |aliases| {
+                        for (aliases) |alias| {
+                            self.printer.format(", {s}", .{alias});
+                        }
+                    }
                     self.printer.printColor(color_clear);
                     if (sc.description) |desc| {
                         var i: usize = 0;
-                        while (i < cmd_column_width - sc.name.len) {
+                        const cmd_len = commandTextLen(&sc);
+                        while (i < cmd_column_width - cmd_len) {
                             self.printer.write(" ");
                             i += 1;
                         }
@@ -215,3 +221,13 @@ const HelpPrinter = struct {
         self.printer.printNewLine();
     }
 };
+
+fn commandTextLen(cmd: *const command.Command) usize {
+    var len = cmd.name.len;
+    if (cmd.aliases) |aliases| {
+        for (aliases) |alias| {
+            len += alias.len + 2;
+        }
+    }
+    return len;
+}

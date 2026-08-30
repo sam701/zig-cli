@@ -216,7 +216,7 @@ pub fn Parser(comptime Iterator: type) type {
                     switch (self.current_command().target) {
                         .subcommands => |cmds| {
                             for (cmds) |*sc| {
-                                if (std.mem.eql(u8, sc.name, some_name)) {
+                                if (isCommandMatch(sc, some_name)) {
                                     try self.command_path.append(self.orig_allocator, sc);
                                     return false;
                                 }
@@ -388,4 +388,14 @@ pub fn getEnvvarName(opt: *const command.Option, app_envvar_prefix: ?[]const u8,
             return null;
         }
     }
+}
+
+fn isCommandMatch(cmd: *const command.Command, name: []const u8) bool {
+    if (std.mem.eql(u8, cmd.name, name)) return true;
+    if (cmd.aliases) |aliases| {
+        for (aliases) |alias| {
+            if (std.mem.eql(u8, alias, name)) return true;
+        }
+    }
+    return false;
 }
