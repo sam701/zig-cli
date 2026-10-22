@@ -73,11 +73,11 @@ fn run() !void {
 **1. Fetch the package:**
 
 ```sh
-# For zig master and zig 0.16
+# For zig master
 zig fetch --save git+https://github.com/sam701/zig-cli
 
-# For zig 0.15
-zig fetch --save git+https://github.com/sam701/zig-cli#zig-0.15
+# For zig 0.17
+zig fetch --save git+https://github.com/sam701/zig-cli#zig-0.17
 ```
 
 **2. Wire it up in `build.zig`:**

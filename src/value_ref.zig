@@ -101,7 +101,7 @@ const ValueList = struct {
     };
 
     fn init(comptime T: type) ValueList {
-        const List = std.ArrayListUnmanaged(T);
+        const List = std.ArrayList(T);
         const gen = struct {
             fn createList(alloc: Allocator) Allocator.Error!*anyopaque {
                 const list = try alloc.create(List);
